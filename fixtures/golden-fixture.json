@@ -1,5 +1,6 @@
 {
   "now": "2020-08-07T07:00:00.000Z",
+  "expanded": true,
   "decks": ["Languages", "Languages::French", "Languages::Cloze", "Finished"],
   "notes": [
     { "id": 1590000000001, "cardId": 1590000000101, "deck": "Languages::French", "notetype": "Basic", "fields": ["Bonjour", "Hello"] },

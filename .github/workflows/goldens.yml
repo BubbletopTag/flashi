@@ -63,6 +63,8 @@ jobs:
           printf '%s\n' '${{ steps.ref.outputs.sha }}' > golden/ANKIDROID_REF
           rm -rf ankidroid
       - uses: peter-evans/create-pull-request@v7
+        id: pull-request
+        continue-on-error: true
         with:
           branch: golden/refresh-android
           title: Refresh pinned Android golden frames
@@ -71,3 +73,6 @@ jobs:
           add-paths: |
             golden/android/
             golden/ANKIDROID_REF
+      - name: Report manual PR fallback
+        if: steps.pull-request.outcome == 'failure'
+        run: echo 'Frames were recorded and pushed to golden/refresh-android. This repository blocks Actions-created PRs; open https://github.com/${{ github.repository }}/compare/main...golden/refresh-android to review them.' >> "$GITHUB_STEP_SUMMARY"

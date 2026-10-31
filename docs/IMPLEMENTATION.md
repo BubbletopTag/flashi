@@ -36,6 +36,18 @@ use OPFS. Test installation/offline mode over HTTPS or on localhost.
 - Deterministic JSON fixture and ten web screen previews, pixelmatch/SSIM report,
   explicit masks, 5% initial budgets and strict missing-baseline option.
 
+## Verification
+
+- `npm run typecheck` passes.
+- All 93 unit tests pass with `FLASHI_ANKI_PYTHON=.venv/bin/python`, including
+  live official-Anki queue/export comparisons.
+- All nine Chromium browser scenarios pass against both release builds.
+- `npm run golden` generates all ten previews; missing Android references are
+  reported as pending rather than parity passes.
+- CI and Pages deployment pass on GitHub. The published site was opened in
+  Chromium, its service worker installed, and it reloaded successfully offline
+  with no page errors: https://bubbletoptag.github.io/flashi/.
+
 ## External validation still required
 
 - No Claude artifact publishing tool is connected here. The built

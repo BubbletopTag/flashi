@@ -4,6 +4,7 @@ package com.ichi2.anki
 
 import android.view.View
 import android.content.Intent
+import anki.decks.SetDeckCollapsedRequest
 import androidx.core.content.edit
 import androidx.core.view.GravityCompat
 import com.ichi2.anki.common.preferences.sharedPrefs
@@ -38,16 +39,21 @@ class FlashiScreenshotTest : ScreenshotTest() {
 
     private fun loadFixture() {
         val decks = fixture.getJSONArray("decks")
-        for (i in 0 until decks.length()) addDeck(decks.getString(i))
+        for (i in 0 until decks.length()) {
+            val id = addDeck(decks.getString(i))
+            col.decks.setCollapsed(id, collapsed = !fixture.getBoolean("expanded"), SetDeckCollapsedRequest.Scope.REVIEWER)
+        }
         val notes = fixture.getJSONArray("notes")
         for (i in 0 until notes.length()) {
             val entry = notes.getJSONObject(i)
-            col.decks.select(col.decks.id(entry.getString("deck")))
+            val deckId = col.decks.id(entry.getString("deck"))
+            col.decks.select(deckId)
             val fields = entry.getJSONArray("fields")
             val note = addNoteUsingNoteTypeName(entry.getString("notetype"), *Array(fields.length()) { fields.getString(it) })
             val card = note.firstCard()
-            col.db.execute("update cards set id=?, due=? where id=?", entry.getLong("cardId"), i + 1, card.id)
+            col.db.execute("update cards set id=?, due=?, did=? where id=?", entry.getLong("cardId"), i + 1, deckId, card.id)
         }
+        col.decks.select(1L)
     }
 
     private fun frame(name: String, card: View? = null) {
@@ -83,6 +89,7 @@ class FlashiScreenshotTest : ScreenshotTest() {
     private fun reviewer(name: String, answer: Boolean = false, cloze: Boolean = false, overflow: Boolean = false) {
         loadFixture()
         col.decks.select(col.decks.id(if (cloze) "Languages::Cloze" else "Languages::French"))
+        check(col.sched.newCount() == if (cloze) 1 else 2) { "Fixture cards must be in the requested study deck" }
         val reviewer = ReviewerTest.startReviewer(this)
         advanceRobolectricLooper()
         if (answer) reviewer.displayCardAnswer()
