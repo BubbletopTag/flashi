@@ -67,7 +67,7 @@ interface UndoEntry {
   revlogIds: number[];
   decks?: string;
   notes?: Array<{ id: number; tags: string; mod: number }>;
-  requeue?: { id: number; kind: QueueEntryKind };
+  requeue?: { id: number; kind: QueueEntryKind; deckId?: number };
 }
 
 export interface QueuedCard {
@@ -574,14 +574,14 @@ export class Collection {
     const card = this.getCard(cardId);
     if (!card) return;
     const cards = this.db.all(`select ${CARD_COLUMNS} from cards where nid = ?`, [card.nid]).map(rowToCard);
-    this.changeQueues(cards, CardQueue.UserBuried, "Bury note");
+    this.changeQueues(cards, CardQueue.UserBuried, "Bury note", cardId);
   }
 
   suspendNote(cardId: number): void {
     const card = this.getCard(cardId);
     if (!card) return;
     const cards = this.db.all(`select ${CARD_COLUMNS} from cards where nid = ?`, [card.nid]).map(rowToCard);
-    this.changeQueues(cards, CardQueue.Suspended, "Suspend note");
+    this.changeQueues(cards, CardQueue.Suspended, "Suspend note", cardId);
   }
 
   private setQueueFor(cardId: number, queue: number, label: string): void {
@@ -589,14 +589,15 @@ export class Collection {
     if (card) this.changeQueues([card], queue, label);
   }
 
-  private changeQueues(cards: Card[], queue: number, label: string): void {
+  private changeQueues(cards: Card[], queue: number, label: string, focusId = cards[0]?.id): void {
     const now = nowSecs();
     const changed = cards.filter((c) => c.queue !== queue && c.queue !== CardQueue.Suspended);
     if (!changed.length) return;
     this.db.transaction(() => {
       for (const c of changed) this.updateCard({ ...c, queue, mod: now, usn: -1 });
     });
-    this.pushUndo({ label, cards: changed, revlogIds: [] });
+    const focus = changed.find((card) => card.id === focusId);
+    this.pushUndo({ label, cards: changed, revlogIds: [], requeue: focus && this.queue ? { id: focus.id, kind: kindForCard(focus), deckId: this.queue.deckId } : undefined });
     this.queue = null;
   }
 
@@ -633,11 +634,11 @@ export class Collection {
       this.decksJson = parseJson(entry.decks);
       this.markJsonDirty();
     }
-    const deckId = this.queue?.deckId;
+    const deckId = entry.requeue?.deckId ?? this.queue?.deckId;
     this.queue = null;
     if (entry.requeue && deckId !== undefined) {
       const q = this.studyQueue(deckId);
-      const card = entry.cards[0]!;
+      const card = entry.cards.find((card) => card.id === entry.requeue!.id)!;
       q.pushFront(card.id, card.mod, entry.requeue.kind, card.due, card.reps);
     }
     this.touch();

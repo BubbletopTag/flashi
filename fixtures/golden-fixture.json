@@ -1,0 +1,10 @@
+{
+  "now": "2020-08-07T07:00:00.000Z",
+  "decks": ["Languages", "Languages::French", "Languages::Cloze", "Finished"],
+  "notes": [
+    { "id": 1590000000001, "cardId": 1590000000101, "deck": "Languages::French", "notetype": "Basic", "fields": ["Bonjour", "Hello"] },
+    { "id": 1590000000002, "cardId": 1590000000102, "deck": "Languages::French", "notetype": "Basic", "fields": ["Merci", "Thank you"] },
+    { "id": 1590000000003, "cardId": 1590000000103, "deck": "Languages::Cloze", "notetype": "Cloze", "fields": ["The capital of France is {{c1::Paris}}.", ""] }
+  ],
+  "screens": ["decks", "empty", "fab", "drawer", "question", "answer", "cloze-question", "cloze-answer", "overflow", "congrats"]
+}

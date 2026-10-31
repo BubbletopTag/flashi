@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { sha1Hex } from "../sha1";
 // Import an Anki package (.apkg / .colpkg-style zip) into a Flashi collection.
 // Merge rules follow rslib/src/import_export/package/apkg/import/*.rs
 // (Copyright: Ankitects Pty Ltd and contributors): notes are matched by GUID,
@@ -105,10 +106,6 @@ function notetypeSchemaKey(m: Json): string {
   return `${m.type ?? 0}\x1e${fields}\x1e${templates}`;
 }
 
-async function sha1Hex(data: Blob): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-1", await data.arrayBuffer());
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

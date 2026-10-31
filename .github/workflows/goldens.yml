@@ -1,0 +1,73 @@
+name: Record Android golden frames
+on:
+  workflow_dispatch:
+    inputs:
+      ankidroid_ref:
+        description: AnkiDroid commit (empty uses golden/ANKIDROID_REF)
+        required: false
+        default: ''
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve pinned ref
+        id: ref
+        env:
+          REQUESTED_REF: ${{ inputs.ankidroid_ref }}
+        run: |
+          ref="${REQUESTED_REF:-$(cat golden/ANKIDROID_REF)}"
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo 'Use a full commit SHA'; exit 1; }
+          echo "sha=$ref" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: ankidroid/Anki-Android
+          ref: ${{ steps.ref.outputs.sha }}
+          path: ankidroid
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: jetbrains
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install shared fixture and screenshot tests
+        run: |
+          mkdir -p ankidroid/AnkiDroid/src/test/java/com/ichi2/anki/flashi
+          mkdir -p ankidroid/AnkiDroid/src/test/resources/flashi
+          cp golden/extra-tests/*.kt ankidroid/AnkiDroid/src/test/java/com/ichi2/anki/flashi/
+          cp fixtures/golden-fixture.json ankidroid/AnkiDroid/src/test/resources/flashi/
+      - name: Warm up and compile
+        working-directory: ankidroid
+        run: ./gradlew robolectricSdkDownload compileScreenshotTests -Pscreenshot -Ptheme=light -Pdevice=phone
+        env:
+          TZ: UTC
+      - name: Record screenshots
+        working-directory: ankidroid
+        run: ./gradlew recordScreenshots -Pscreenshot -Ptheme=light -Pdevice=phone --stacktrace
+        env:
+          TZ: UTC
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-screenshots
+          path: ankidroid/**/build/outputs/roborazzi/
+      - name: Collect canonical frames
+        run: |
+          mkdir -p golden/android
+          cp ankidroid/AnkiDroid/build/outputs/roborazzi/FlashiScreenshotTest/*.png golden/android/
+          cp ankidroid/AnkiDroid/build/outputs/roborazzi/FlashiScreenshotTest/*.json golden/android/
+          printf '%s\n' '${{ steps.ref.outputs.sha }}' > golden/ANKIDROID_REF
+          rm -rf ankidroid
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: golden/refresh-android
+          title: Refresh pinned Android golden frames
+          commit-message: Refresh Android golden frames
+          body: Re-recorded canonical Android screenshots using the pinned AnkiDroid commit and shared JSON fixture. Review the visual report before merging.
+          add-paths: |
+            golden/android/
+            golden/ANKIDROID_REF

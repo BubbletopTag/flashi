@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Shown when a deck has nothing left to study (Anki's congrats page).
 
-import { answerButtonTime } from "../anki/scheduler/timespan";
 import type { AppController } from "../app/controller";
 import { TextButton, Toolbar } from "../app/ui";
+
+export function learningWait(seconds: number): string {
+  const minutes = Math.max(1, Math.ceil(seconds / 60));
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  const hours = Math.ceil(minutes / 60);
+  return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+}
 
 export function Congrats(props: { app: AppController; deckId: number; onBack: () => void; onStudyAgain: () => void }) {
   const { app } = props;
@@ -20,7 +26,7 @@ export function Congrats(props: { app: AppController; deckId: number; onBack: ()
           </svg>
           <h2>Congratulations! You have finished this deck for now.</h2>
           {info.learnRemaining > 0 ? (
-            <p>The next learning card will be ready in {answerButtonTime(info.secsUntilNextLearn).replace(/m$/, " minutes").replace(/h$/, " hours").replace(/s$/, " seconds")}.</p>
+            <p>The next learning card will be ready in {learningWait(info.secsUntilNextLearn)}.</p>
           ) : null}
           {info.reviewRemaining ? (
             <p>Today's review limit has been reached, but there are still cards waiting to be reviewed. For optimum memory, consider increasing the daily limit in the deck's options.</p>

@@ -1,5 +1,9 @@
 # Flashi — Session Handoff (2026-10-31)
 
+> **2026-10-31 update:** Read [IMPLEMENTATION.md](IMPLEMENTATION.md) first for
+> the current implementation, verification, and remaining external checks. The
+> status tables and remaining-work list below describe the original handoff.
+
 > For the next Claude Code session. Read this first, then `docs/SPEC.md` (the original
 > build brief, unchanged). Everything below is committed on `main` of `BubbletopTag/flashi`.
 

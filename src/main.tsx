@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { render } from "preact";
+import "@fontsource/roboto/latin-400.css";
+import "@fontsource/roboto/latin-500.css";
+import "@fontsource/roboto/latin-700.css";
 import "./theme/tokens.flashi.css";
 import "./theme/base.css";
 import { App } from "./app/App";
@@ -12,7 +15,9 @@ async function start(): Promise<void> {
     document.documentElement.dataset.theme = "golden";
   }
   try {
-    const app = await AppController.boot();
+    const app = __FLASHI_GOLDEN__ && new URLSearchParams(location.search).get("fixture") === "golden"
+      ? await (await import("./app/golden")).goldenApp()
+      : await AppController.boot();
     root.textContent = "";
     render(<App app={app} />, root);
   } catch (e) {
@@ -24,4 +29,15 @@ async function start(): Promise<void> {
   }
 }
 
-void start();
+// The SAH pool and the in-memory study queues each have one writer per origin.
+// Keep a Web Lock for this page's lifetime so a second tab cannot overwrite work.
+if (navigator.locks) {
+  void navigator.locks.request("flashi-collection-writer", { ifAvailable: true }, async (lock) => {
+    if (!lock) {
+      document.querySelector("#app")!.textContent = "Flashi is already open in another tab. Close that tab, then reload here to study.";
+      return;
+    }
+    await start();
+    await new Promise<void>(() => {});
+  });
+} else void start();

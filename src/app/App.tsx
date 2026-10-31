@@ -5,6 +5,7 @@ import { About, Settings } from "../screens/Settings";
 import { Congrats } from "../screens/Congrats";
 import { DeckPicker } from "../screens/DeckPicker";
 import { Reviewer } from "../screens/Reviewer";
+import { PwaNotices } from "../platform/pwa";
 import { WARN_IMPORT_BYTES, type AppController } from "./controller";
 import { Dialog, FlashiLogo, Icon, ripple, Snackbar, TextButton, Toolbar, type SnackbarMessage } from "./ui";
 
@@ -14,13 +15,22 @@ type Modal =
   | { kind: "createDeck" }
   | { kind: "progress"; title: string; label: string; fraction: number | null }
   | { kind: "message"; title: string; text: string }
-  | { kind: "confirmLarge"; file: File };
+  | { kind: "confirmLarge"; file: File }
+  | { kind: "deleteData" };
 
 export function App({ app }: { app: AppController }) {
+  const goldenScreen = __FLASHI_GOLDEN__ && new URLSearchParams(location.search).get("fixture") === "golden" ? new URLSearchParams(location.search).get("screen") : null;
+  const initialScreen = (): Screen => {
+    if (goldenScreen === "congrats") return { name: "congrats", deckId: app.col.deckByName("Finished")!.id };
+    if (goldenScreen && ["question", "answer", "overflow", "cloze-question", "cloze-answer"].includes(goldenScreen)) {
+      return { name: "review", deckId: app.col.deckByName(goldenScreen.startsWith("cloze") ? "Languages::Cloze" : "Languages::French")!.id };
+    }
+    return { name: "decks" };
+  };
   const [, setVersion] = useState(0);
-  const [screen, setScreen] = useState<Screen>({ name: "decks" });
-  const [drawer, setDrawer] = useState(false);
-  const [fabOpen, setFabOpen] = useState(false);
+  const [screen, setScreen] = useState<Screen>(initialScreen);
+  const [drawer, setDrawer] = useState(goldenScreen === "drawer");
+  const [fabOpen, setFabOpen] = useState(goldenScreen === "fab");
   const [modal, setModal] = useState<Modal | null>(null);
   const [snack, setSnack] = useState<SnackbarMessage | null>(null);
   const [deckName, setDeckName] = useState("");
@@ -110,9 +120,9 @@ export function App({ app }: { app: AppController }) {
       body = (
         <div class="screen">
           <Toolbar title="Flashi" nav={{ icon: "menu", label: "Open menu", onClick: () => setDrawer(true) }} />
-          {app.storageError ? (
+          {app.storageError || app.saveError ? (
             <div class="banner warn" role="alert">
-              <p>Storage is unavailable here, so progress won't survive a reload. Export a backup to keep it.</p>
+              <p>{app.saveError ? "Your latest changes couldn't be saved." : "Storage is unavailable here, so progress won't survive a reload."} Export a backup to keep your progress.</p>
               <TextButton label="Export" onClick={() => void exportBackup()} />
             </div>
           ) : needsBackup ? (
@@ -132,7 +142,7 @@ export function App({ app }: { app: AppController }) {
           deckId={screen.deckId}
           onBack={() => setScreen({ name: "decks" })}
           onFinished={() => setScreen({ name: "congrats", deckId: screen.deckId })}
-          showMessage={showMessage}
+          showMessage={(text, action) => showMessage(text, action ? { label: action.label, onClick: () => { action.onClick(); setScreen({ name: "review", deckId: screen.deckId }); } } : undefined)}
         />
       );
       break;
@@ -147,7 +157,7 @@ export function App({ app }: { app: AppController }) {
       );
       break;
     case "settings":
-      body = <Settings app={app} onMenu={() => setDrawer(true)} onExport={() => void exportBackup()} onImport={openImport} onAbout={() => setScreen({ name: "about" })} />;
+      body = <Settings app={app} onMenu={() => setDrawer(true)} onExport={() => void exportBackup()} onImport={openImport} onAbout={() => setScreen({ name: "about" })} onDelete={() => setModal({ kind: "deleteData" })} />;
       break;
     case "about":
       body = <About onBack={() => setScreen({ name: "settings" })} />;
@@ -160,8 +170,9 @@ export function App({ app }: { app: AppController }) {
   };
 
   return (
-    <>
+    <div class={`app-shell${snack ? " has-snackbar" : ""}`}>
       {body}
+      {__FLASHI_TARGET__ === "pwa" ? <PwaNotices app={app} /> : null}
       {drawer ? (
         <>
           <div class="scrim" onClick={() => setDrawer(false)} />
@@ -263,8 +274,20 @@ export function App({ app }: { app: AppController }) {
           </div>
         </Dialog>
       ) : null}
+      {modal?.kind === "deleteData" ? (
+        <Dialog title="Delete all data?" onDismiss={() => setModal(null)}>
+          <p>This permanently removes all decks, media, progress, and automatic backups from this device. Export a backup first if you want to keep them.</p>
+          <div class="actions">
+            <TextButton label="Cancel" onClick={() => setModal(null)} />
+            <TextButton label="Delete everything" onClick={() => {
+              setModal({ kind: "progress", title: "Deleting data", label: "Removing this device's collection…", fraction: null });
+              void app.deleteAllData().catch((e: unknown) => setModal({ kind: "message", title: "Delete failed", text: e instanceof Error ? e.message : String(e) }));
+            }} />
+          </div>
+        </Dialog>
+      ) : null}
       <Snackbar message={snack} onDone={() => setSnack(null)} />
-    </>
+    </div>
   );
 }
 

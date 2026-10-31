@@ -1,0 +1,4 @@
+{
+  "reason": "Brand title/logo; reviewer card bounds come from Android metadata (Robolectric cannot render WebViews).",
+  "rects": []
+}

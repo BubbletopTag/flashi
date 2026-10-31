@@ -401,6 +401,11 @@ export class StudyQueue {
 
   /** Put an entry back at the front (used after undo). */
   pushFront(id: number, mtime: number, kind: QueueEntryKind, due: number, reps: number): void {
+    const existing = this.main.find((e) => e.id === id);
+    if (existing?.kind === "new") this.counts.new--;
+    else if (existing?.kind === "review") this.counts.review--;
+    else if (existing) this.counts.learning--;
+    if (this.intradayLearning.some((e) => e.id === id && e.due <= this.aheadCutoff())) this.counts.learning--;
     this.intradayLearning = this.intradayLearning.filter((e) => e.id !== id);
     this.main = this.main.filter((e) => e.id !== id);
     if (kind === "learning") {

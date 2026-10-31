@@ -15,3 +15,8 @@ declare module "virtual:sqlite-wasm-base64" {
   const base64: string;
   export default base64;
 }
+
+declare module "virtual:third-party-notices" {
+  const notices: string;
+  export default notices;
+}

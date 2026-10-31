@@ -15,6 +15,7 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
+html { height: 100dvh; }
 body {
   background: var(--window-bg);
   color: var(--text);
@@ -44,6 +45,10 @@ button { font: inherit; color: inherit; }
   overflow: hidden;
   position: relative;
 }
+.app-shell { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.has-snackbar .studied-today { bottom: calc(76px + var(--safe-bottom)); }
+.has-snackbar .fab-area { transform: translateY(-64px); }
+.danger .label { color: var(--count-learn); }
 
 /* ---------------------------------------------------------------- ripple */
 .ripple { position: relative; overflow: hidden; cursor: pointer; user-select: none; -webkit-user-select: none; }
@@ -131,7 +136,7 @@ button { font: inherit; color: inherit; }
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(72px + var(--safe-bottom));
+  padding: 0 0 calc(72px + var(--safe-bottom));
   margin: 0;
   list-style: none;
 }
@@ -373,6 +378,7 @@ button { font: inherit; color: inherit; }
 .about a { color: var(--primary); }
 .about ul { margin: 0 0 12px; padding-left: 20px; line-height: 22px; }
 .about code { font-size: 13px; }
+.license-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 18px; }
 
 /* ---------------------------------------------------------------- drawer */
 .scrim { position: absolute; inset: 0; background: var(--scrim); z-index: 20; animation: fade 150ms ease-out; }

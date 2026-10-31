@@ -39,22 +39,26 @@ export class AppController {
     public meta: StoreMeta,
   ) {}
 
+  static async temporary(col: Collection, store: CollectionStore): Promise<AppController> {
+    return new AppController(col, store, null, await store.getMeta());
+  }
+
   static async boot(): Promise<AppController> {
     const { store, error } = await openStore();
     let col: Collection;
     let fresh = false;
-    let loadError = error;
-    try {
-      const bytes = await store.loadCollection();
-      if (bytes) col = await Collection.open(bytes);
-      else {
-        col = await Collection.create();
-        fresh = true;
-      }
-    } catch (e) {
-      loadError = `Your saved collection couldn't be opened (${e instanceof Error ? e.message : String(e)}). Starting with an empty one.`;
+    const bytes = await store.loadCollection().catch((e: unknown) => {
+      throw new Error(`Your saved data couldn't be read (${e instanceof Error ? e.message : String(e)}). Reload to try again.`);
+    });
+    if (!bytes) {
       col = await Collection.create();
       fresh = true;
+    } else {
+      try {
+        col = await Collection.open(bytes);
+      } catch (e) {
+        throw new Error(`Your saved collection couldn't be opened (${e instanceof Error ? e.message : String(e)}). Your saved data has been kept. Try reloading or restoring a backup.`);
+      }
     }
     let meta: StoreMeta = {};
     try {
@@ -62,7 +66,7 @@ export class AppController {
     } catch {
       meta = {};
     }
-    const app = new AppController(col, store, loadError, meta);
+    const app = new AppController(col, store, error, meta);
     await app.replayJournal();
     if (fresh) {
       app.meta.createdAt ??= Date.now();
@@ -100,6 +104,8 @@ export class AppController {
       this.lastJournalKey = Math.max(this.lastJournalKey, e.key ?? 0);
       if (this.col.db.scalar("select 1 from revlog where id = ?", [e.revlogId])) continue;
       try {
+        const card = this.col.getCard(e.cardId);
+        if (card) this.col.studyQueue(card.did, Math.floor(e.answeredAtMs / 1000));
         this.col.answerCard(e.cardId, e.rating, e.millisecondsTaken, e.answeredAtMs);
         replayed++;
       } catch {
@@ -123,9 +129,8 @@ export class AppController {
       clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
-    if (this.saving) await this.saving;
-    const journalKey = this.lastJournalKey;
-    this.saving = (async () => {
+    const save = (this.saving ?? Promise.resolve()).then(async () => {
+      const journalKey = this.lastJournalKey;
       try {
         await this.store.saveCollection(this.col.serialize());
         if (journalKey) await this.store.clearJournal(journalKey);
@@ -134,9 +139,10 @@ export class AppController {
       } catch (e) {
         this.saveError = e instanceof Error ? e.message : String(e);
       }
-    })();
-    await this.saving;
-    this.saving = null;
+    });
+    this.saving = save;
+    await save;
+    if (this.saving === save) this.saving = null;
     this.notify();
   }
 
@@ -179,6 +185,12 @@ export class AppController {
   changed(): void {
     this.notify();
     this.scheduleSave(500);
+  }
+
+  async undo(): Promise<string | null> {
+    const label = this.col.undo();
+    if (label) await this.saveNow();
+    return label;
   }
 
   /** AnkiDroid's estimate of minutes left (libanki Scheduler.eta). */
@@ -260,6 +272,17 @@ export class AppController {
     return result;
   }
 
+  async exportAutomaticBackup(id: number): Promise<void> {
+    const bytes = await this.store.readBackup?.(id);
+    if (!bytes) throw new Error("This automatic backup is no longer available.");
+    const collection = await Collection.open(bytes);
+    try {
+      const blob = await exportPackage(collection, this.store.media);
+      const result = await saveFile(blob, backupFilename(new Date(id)) + " automatic");
+      if (result.outcome !== "saved") throw new Error("The backup couldn't be downloaded.");
+    } finally { collection.db.close(); }
+  }
+
   /** Days since the last export, or null if never exported. */
   daysSinceBackup(): number | null {
     if (!this.meta.lastExportAt) return null;
@@ -267,6 +290,9 @@ export class AppController {
   }
 
   async deleteAllData(): Promise<void> {
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    if (this.saving) await this.saving;
     await this.store.clear();
     location.reload();
   }

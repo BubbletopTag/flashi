@@ -24,6 +24,8 @@ export interface StoreMeta {
   createdAt?: number;
   /** Per-device preferences (reviewer title, ETA, …). */
   prefs?: Record<string, unknown>;
+  opfsMigrated?: boolean;
+  installHintDismissed?: boolean;
 }
 
 export interface CollectionStore {
@@ -39,6 +41,8 @@ export interface CollectionStore {
   setMeta(patch: Partial<StoreMeta>): Promise<void>;
   /** Wipe everything (used by "Delete all data"). */
   clear(): Promise<void>;
+  listBackups?(): Promise<number[]>;
+  readBackup?(id: number): Promise<Uint8Array | null>;
 }
 
 const DB_NAME = "flashi";
@@ -204,16 +208,26 @@ export class MemoryStore implements CollectionStore {
 
 /** Open IndexedDB storage, falling back to memory if the browser refuses. */
 export async function openStore(): Promise<{ store: CollectionStore; error: string | null }> {
+  let store: CollectionStore;
   try {
     if (typeof indexedDB === "undefined") throw new Error("IndexedDB is not available");
     const db = await openDb();
-    const store = new IdbStore(db);
+    store = new IdbStore(db);
     // Probe a write: some private modes open fine but refuse writes.
     await store.setMeta({});
-    return { store, error: null };
   } catch (e) {
     return { store: new MemoryStore(), error: e instanceof Error ? e.message : String(e) };
   }
+  if (__FLASHI_TARGET__ === "pwa" && isSecureContext && typeof navigator.storage?.getDirectory === "function" && typeof Worker !== "undefined") {
+    try {
+      const { openOpfsStore } = await import("./opfs");
+      store = await openOpfsStore(store);
+    } catch (error) {
+      // Never open a stale IndexedDB copy after a successful migration.
+      if ((await store.getMeta()).opfsMigrated) throw error;
+    }
+  }
+  return { store, error: null };
 }
 
 export async function storageEstimate(): Promise<{ usage: number; quota: number } | null> {

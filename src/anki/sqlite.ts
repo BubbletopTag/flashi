@@ -15,16 +15,22 @@ let sqlitePromise: Promise<Sqlite3> | null = null;
 export function loadSqlite(): Promise<Sqlite3> {
   // The published typings omit the Emscripten module options it accepts.
   const init = sqlite3InitModule as unknown as (options: object) => Promise<Sqlite3>;
-  sqlitePromise ??= init({
+  sqlitePromise ??= new Promise<Sqlite3>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("The database engine took too long to start. Reload to try again.")), 30_000);
+    init({
     print: () => {},
     printErr: (...args: unknown[]) => console.warn("sqlite:", ...args),
     instantiateWasm(imports: WebAssembly.Imports, onSuccess: (i: WebAssembly.Instance, m: WebAssembly.Module) => void) {
       sqliteWasmBytes()
         .then((bytes) => WebAssembly.instantiate(bytes, imports))
         .then((r) => onSuccess(r.instance, r.module))
-        .catch((e: unknown) => console.error("Could not start the database engine", e));
+        .catch(reject);
       return {};
     },
+    }).then(resolve, reject).finally(() => clearTimeout(timer));
+  }).catch((error) => {
+    sqlitePromise = null;
+    throw error;
   });
   return sqlitePromise;
 }

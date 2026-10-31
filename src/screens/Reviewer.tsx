@@ -93,7 +93,7 @@ export function Reviewer(props: {
     void buildCardDocument({ body, css: content.css, ord: content.ord, side, media: app.store.media }).then((html) => {
       if (cancelled) return;
       setDoc(html);
-      if (config.autoplay) void audio.play(side === "q" ? content.questionAv : content.answerAv);
+      if (config.autoplay && prefs.autoplay) void audio.play(side === "q" ? content.questionAv : content.answerAv);
     });
     return () => {
       cancelled = true;
@@ -169,11 +169,13 @@ export function Reviewer(props: {
   });
 
   const undo = () => {
-    const label = col.undo();
-    if (!label) return;
-    app.changed();
-    loadNext();
-    props.showMessage(`${label} undone`);
+    if (busy.current) return;
+    busy.current = true;
+    void app.undo().then((label) => {
+      if (!label) return;
+      loadNext();
+      props.showMessage(`${label} undone`);
+    }).catch((e: unknown) => props.showMessage(e instanceof Error ? e.message : String(e))).finally(() => { busy.current = false; });
   };
 
   const cardOps = (op: "buryCard" | "buryNote" | "suspendCard" | "suspendNote", message: string) => {
