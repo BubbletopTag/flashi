@@ -485,6 +485,58 @@ export class Collection {
     return result.card;
   }
 
+  /** rslib scheduler/congrats.rs: what's left in `deckId` once studying is done. */
+  congratsInfo(deckId: number, now = nowSecs()): {
+    learnRemaining: number;
+    secsUntilNextLearn: number;
+    reviewRemaining: boolean;
+    newRemaining: boolean;
+    haveBuried: boolean;
+  } {
+    const today = this.timing(now).daysElapsed;
+    const root = this.deck(deckId);
+    const ids = this.decksSorted()
+      .filter((d) => root && (d.id === root.id || d.name.startsWith(root.name + "::")))
+      .map((d) => d.id);
+    const list = ids.length ? ids.join(",") : "-1";
+    const r = this.db.first(
+      `select
+        coalesce(sum(queue in (2, 3) and due <= ?), 0),
+        coalesce(sum(queue = 0), 0),
+        coalesce(sum(queue in (-2, -3)), 0),
+        coalesce(sum(queue = 1), 0),
+        max(0, coalesce(min(case when queue = 1 then due else null end), 0))
+      from cards where did in (${list})`,
+      [today],
+    );
+    const nextLearnDue = num(r?.[4]);
+    return {
+      learnRemaining: num(r?.[3]),
+      secsUntilNextLearn: nextLearnDue === 0 ? 86_400 : Math.max(nextLearnDue - this.learnAheadSecs() - now, 60),
+      reviewRemaining: num(r?.[0]) > 0,
+      newRemaining: num(r?.[1]) > 0,
+      haveBuried: num(r?.[2]) > 0,
+    };
+  }
+
+  /** Restore buried cards in a deck and its subdecks. */
+  unburyDeck(deckId: number): void {
+    const root = this.deck(deckId);
+    if (!root) return;
+    const ids = this.decksSorted()
+      .filter((d) => d.id === root.id || d.name.startsWith(root.name + "::"))
+      .map((d) => d.id);
+    this.db.exec(
+      `update cards set queue = case
+          when type in (1, 3) then (case when due > 1000000000 then 1 else 3 end)
+          when type = 0 then 0 else 2 end, mod = ?, usn = -1
+        where queue in (-2, -3) and did in (${ids.join(",")})`,
+      [nowSecs()],
+    );
+    this.queue = null;
+    this.touch();
+  }
+
   private burySiblingsAfterAnswer(card: Card, config: DeckConfig, entry: UndoEntry): void {
     if (!config.buryNew && !config.buryReviews && !config.buryInterdayLearning) return;
     const siblings = this.db

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
@@ -17,6 +19,9 @@ export default defineConfig(({ mode }) => {
   const wasmSource =
     mode === "test" ? "src/platform/wasm-node.ts" : singleFile ? "src/platform/wasm-inline.ts" : "src/platform/wasm-url.ts";
 
+  const mathjaxSource =
+    mode === "test" ? "src/platform/mathjax-none.ts" : singleFile ? "src/platform/mathjax-inline.ts" : "src/platform/mathjax-url.ts";
+
   return {
     base: "./",
     publicDir: mode === "pwa" ? "public" : false,
@@ -28,9 +33,10 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "#wasm-source": fileURLToPath(new URL(wasmSource, import.meta.url)),
+        "#mathjax-source": fileURLToPath(new URL(mathjaxSource, import.meta.url)),
       },
     },
-    plugins: singleFile ? [viteSingleFile({ removeViteModuleLoader: true }), renameHtml("flashi.html")] : [],
+    plugins: [inlineWasm(), ...(singleFile ? [viteSingleFile({ removeViteModuleLoader: true }), renameHtml("flashi.html")] : [])],
     build: {
       outDir: mode === "golden" ? "dist-golden" : singleFile ? "dist" : "dist-pwa",
       emptyOutDir: true,
@@ -45,6 +51,22 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
+
+/** `virtual:sqlite-wasm-base64`: the SQLite WASM binary as a base64 string (artifact build). */
+function inlineWasm(): Plugin {
+  const id = "virtual:sqlite-wasm-base64";
+  return {
+    name: "flashi-inline-wasm",
+    resolveId(source) {
+      return source === id ? "\0" + id : null;
+    },
+    load(resolved) {
+      if (resolved !== "\0" + id) return null;
+      const path = createRequire(import.meta.url).resolve("@sqlite.org/sqlite-wasm/sqlite3.wasm");
+      return `export default ${JSON.stringify(readFileSync(path).toString("base64"))};`;
+    },
+  };
+}
 
 function renameHtml(name: string): Plugin {
   return {

@@ -6,3 +6,12 @@ declare const __FLASHI_VERSION__: string;
 declare module "#wasm-source" {
   export function sqliteWasmBytes(): Promise<BufferSource>;
 }
+
+declare module "#mathjax-source" {
+  export function mathjaxScript(): string;
+}
+
+declare module "virtual:sqlite-wasm-base64" {
+  const base64: string;
+  export default base64;
+}

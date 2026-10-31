@@ -1,0 +1,40 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Dev/test only (?theme=golden): AnkiDroid's Light theme, exact values read from
+   common/android/src/main/res/values/theme_light.xml and colors.xml at
+   golden/ANKIDROID_REF. Used only to diff against AnkiDroid screenshots; it is
+   stripped from published builds. */
+:root[data-theme="golden"] {
+  --primary: #03A9F4;          /* colorPrimary = material_light_blue_500 (app bar) */
+  --on-primary: #FFFFFF;       /* actionBarTextColor */
+  --primary-dark: #0288D1;     /* colorPrimaryDark = material_light_blue_700 */
+  --accent: #455A64;           /* colorAccent = material_blue_grey_700 */
+  --window-bg: #FFFFFF;
+  --on-surface: #000000;
+  --on-surface-variant: #555555;
+  --surface-variant: #D6ECFA;
+  --surface-container: #FFFFFF;
+  --surface-container-high: #E4F5FD;
+  --outline-variant: #9BBDD4;
+  --current-deck-bg: #ECECEC;  /* currentDeckBackgroundColor */
+  --topbar: #B3E5FC;           /* topBarColor = material_light_blue_100 */
+  --fab: #0288D1;              /* fab_normal = material_light_blue_700 */
+  --on-fab: #FFFFFF;           /* colorOnPrimaryContainer (FAB icons) */
+  --divider: #E5E5E5;          /* drawable/divider */
+  --count-new: #303F9F;        /* newCountColor = indigo_700 */
+  --count-learn: #D32F2F;      /* learnCountColor = red_700 */
+  --count-review: #2E7D32;     /* reviewCountColor = green_800 */
+  --count-zero: rgba(0, 0, 0, 0.122); /* zeroCountColor #1f000000 */
+  --btn-again: #D32F2F; --btn-hard: #455A64; --btn-good: #4CAF50; --btn-easy: #03A9F4;
+  --btn-again-pressed: #F44336; --btn-hard-pressed: #B0BEC5; --btn-good-pressed: #81C784; --btn-easy-pressed: #4FC3F7;
+  --btn-text: #FFFFFF;
+  --show-answer: var(--btn-hard); /* legacy reviewer: flashcard_layout_flip uses hardButtonRef */
+  --show-answer-pressed: var(--btn-hard-pressed);
+  --text: #000000;
+  --text-secondary: #555555;
+  --dyn-deck: #2222BB;
+  --snackbar: #424242;
+  --snackbar-action: #4FC3F7;
+  --scrim: rgba(0, 0, 0, 0.32);
+  --flag-red: #FF4747; --flag-orange: #FFB647; --flag-green: #6FF06F; --flag-blue: #5289FF;
+  --flag-pink: #FF99F1; --flag-turquoise: #85FFEF; --flag-purple: #C398EC;
+}

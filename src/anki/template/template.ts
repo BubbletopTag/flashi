@@ -265,17 +265,23 @@ export interface RenderedCard {
   isEmpty: boolean;
 }
 
+/**
+ * Render both sides. `processQuestion` post-processes the question before it
+ * is used for {{FrontSide}} (the caller turns sound tags into replay buttons
+ * there, so the answer side doesn't treat the question's audio as its own).
+ */
 export function renderCard(
   qfmt: string,
   afmt: string,
   fields: Map<string, string>,
   cardOrd: number,
   isCloze: boolean,
+  processQuestion: (question: string) => string = (q) => q,
 ): RenderedCard {
   const nonEmptyFields = new Set<string>();
   for (const [name, value] of fields) if (!fieldIsEmpty(value)) nonEmptyFields.add(name);
   const ctx: RenderContext = { fields, nonEmptyFields, cardOrd, frontSide: null };
-  const question = renderTemplate(qfmt, ctx);
+  const rawQuestion = renderTemplate(qfmt, ctx);
   let emptyMessage: string | null = null;
   if (isCloze) {
     const ords = new Set<number>();
@@ -286,7 +292,8 @@ export function renderCard(
   } else if (!rendersWithFields(parseTemplate(qfmt), nonEmptyFields)) {
     emptyMessage = "<div>The front of this card is blank.</div>";
   }
-  if (emptyMessage) return { question: question + emptyMessage, answer: emptyMessage, isEmpty: true };
+  if (emptyMessage) return { question: rawQuestion + emptyMessage, answer: emptyMessage, isEmpty: true };
+  const question = processQuestion(rawQuestion);
   ctx.frontSide = question;
   return { question, answer: renderTemplate(afmt, ctx), isEmpty: false };
 }

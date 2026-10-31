@@ -71,12 +71,16 @@ export function renderCardContent(col: Collection, card: Card): CardContent {
   const template = (isCloze ? templates[0] : templates.find((t) => t.ord === card.ord) ?? templates[card.ord]) ?? templates[0];
   const fields = splitFields(note.flds);
   const map = fieldMap(col, card, model, fields, template, note.tags);
+  const questionAv: AvTag[] = [];
+  const answerAv: AvTag[] = [];
   let question: string;
   let answer: string;
   try {
-    const r = renderCard(String(template.qfmt ?? ""), String(template.afmt ?? ""), map, card.ord, isCloze);
+    const r = renderCard(String(template.qfmt ?? ""), String(template.afmt ?? ""), map, card.ord, isCloze, (q) =>
+      extractAv(q, "q", questionAv),
+    );
     question = r.question;
-    answer = r.answer;
+    answer = extractAv(r.answer, "a", answerAv);
   } catch (e) {
     const msg = `<div class="flashi-template-error">${escapeHtml(e instanceof TemplateError ? e.message : String(e))}</div>`;
     question = msg;
@@ -94,19 +98,14 @@ export function renderCardContent(col: Collection, card: Card): CardContent {
     } else {
       const expected = parts.includes("cloze") ? extractClozeForTyping(value, card.ord + 1) : value;
       typeAnswer = { expected, ignoreCase: parts.includes("ci") };
-      question = question.replace(
-        TYPE_TAG,
-        `<center><input type="text" id="typeans" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type answer"></center>`,
-      );
+      // AnkiDroid's default (useInputTag off): a placeholder in the card, and a
+      // native input bar below it (see the reviewer).
+      question = question.replace(TYPE_TAG, `<span id="typeans" class="typePrompt">........</span>`);
     }
   }
   // Remaining type tags (e.g. in {{FrontSide}}) are stripped; the answer gets the comparison.
   question = question.replace(new RegExp(TYPE_TAG.source, "g"), "");
 
-  const questionAv: AvTag[] = [];
-  const answerAv: AvTag[] = [];
-  question = extractAv(question, "q", questionAv);
-  answer = extractAv(answer, "a", answerAv);
   return { question, answer, css: String(model.css ?? ""), ord: card.ord, questionAv, answerAv, typeAnswer };
 }
 
