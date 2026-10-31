@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
@@ -24,6 +25,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: "./",
+    server: { watch: { ignored: ["**/dist/**", "**/dist-pwa/**", "**/dist-golden/**", "**/golden/report/**", "**/test-results/**", "**/playwright-report/**"] } },
     publicDir: mode === "pwa" ? "public" : false,
     define: {
       __FLASHI_TARGET__: JSON.stringify(singleFile ? "artifact" : "pwa"),
@@ -36,7 +38,7 @@ export default defineConfig(({ mode }) => {
         "#mathjax-source": fileURLToPath(new URL(mathjaxSource, import.meta.url)),
       },
     },
-    plugins: [inlineWasm(), ...(singleFile ? [viteSingleFile({ removeViteModuleLoader: true }), renameHtml("flashi.html")] : [])],
+    plugins: [inlineWasm(), bundledNotices(), ...(mode === "pwa" ? [pwa()] : []), ...(singleFile ? [viteSingleFile({ removeViteModuleLoader: true }), renameHtml("flashi.html")] : [])],
     build: {
       outDir: mode === "golden" ? "dist-golden" : singleFile ? "dist" : "dist-pwa",
       emptyOutDir: true,
@@ -68,6 +70,19 @@ function inlineWasm(): Plugin {
   };
 }
 
+function bundledNotices(): Plugin {
+  return {
+    name: "flashi-notices",
+    resolveId: (id) => id === "virtual:third-party-notices" ? "\0" + id : null,
+    load(id) {
+      if (id !== "\0virtual:third-party-notices") return null;
+      const files = ["NOTICE.md", "LICENSE", ...["preact", "fflate", "fzstd", "mathjax", "@fontsource/roboto"].map((name) => `node_modules/${name}/LICENSE`)];
+      const contents = files.map((file) => `${file}\n\n${readFileSync(file, "utf8")}`).join("\n\n────────────────────────────────\n\n");
+      return `export default ${JSON.stringify(contents)}`;
+    },
+  };
+}
+
 function renameHtml(name: string): Plugin {
   return {
     name: "flashi-rename-html",
@@ -75,6 +90,51 @@ function renameHtml(name: string): Plugin {
     generateBundle(_options, bundle) {
       const html = bundle["index.html"];
       if (html) html.fileName = name;
+      for (const key of Object.keys(bundle)) if (/sqlite3-worker1-.*\.js$/.test(key)) delete bundle[key];
+    },
+  };
+}
+
+/** Build a versioned, scope-relative precache, including WASM, workers and fonts. */
+function pwa(): Plugin {
+  return {
+    name: "flashi-pwa",
+    transformIndexHtml() {
+      return [
+        { tag: "link", attrs: { rel: "manifest", href: "./manifest.webmanifest" }, injectTo: "head" },
+        { tag: "link", attrs: { rel: "apple-touch-icon", href: "./icons/flashi-180.png" }, injectTo: "head" },
+        { tag: "meta", attrs: { name: "apple-mobile-web-app-capable", content: "yes" }, injectTo: "head" },
+        { tag: "meta", attrs: { name: "apple-mobile-web-app-status-bar-style", content: "default" }, injectTo: "head" },
+      ];
+    },
+    generateBundle(_options, bundle) {
+      const publicFiles = readdirSync("public", { recursive: true }).map(String).filter((name) => /\.(png|webmanifest)$/.test(name));
+      const files = ["./", ...Object.keys(bundle), ...publicFiles];
+      const hash = createHash("sha256");
+      for (const [name, item] of Object.entries(bundle)) hash.update(name).update(item.type === "chunk" ? item.code : item.source);
+      for (const name of publicFiles) hash.update(readFileSync(`public/${name}`));
+      const version = hash.digest("hex").slice(0, 16);
+      this.emitFile({ type: "asset", fileName: "sw.js", source: `
+const CACHE = 'flashi-${version}';
+const ROOT = new URL('./', self.location.href);
+const FILES = ${JSON.stringify(files)}.map(file => new URL(file, ROOT).href);
+self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES))));
+self.addEventListener('message', event => { if (event.data === 'SKIP_WAITING') self.skipWaiting(); });
+self.addEventListener('activate', event => event.waitUntil((async () => {
+  for (const key of await caches.keys()) if (key.startsWith('flashi-') && key !== CACHE) await caches.delete(key);
+  await self.clients.claim();
+})()));
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== ROOT.origin || !url.pathname.startsWith(ROOT.pathname)) return;
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    if (event.request.mode === 'navigate') return (await cache.match(ROOT.href)) || fetch(event.request);
+    return (await cache.match(event.request, { ignoreSearch: true })) || fetch(event.request);
+  })());
+});
+` });
     },
   };
 }
