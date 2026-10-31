@@ -1,0 +1,37 @@
+{
+  "name": "flashi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Free, open-source, mobile-first flashcard web app modeled on AnkiDroid. Imports Anki .apkg decks.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:artifact && npm run build:pwa",
+    "build:artifact": "vite build --mode artifact",
+    "build:pwa": "vite build --mode pwa",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "check": "npm run typecheck && npm test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@sqlite.org/sqlite-wasm": "^3.54.1-build1",
+    "fflate": "^0.8.3",
+    "fzstd": "^0.1.1",
+    "preact": "^11.1.0"
+  },
+  "devDependencies": {
+    "@material/material-color-utilities": "^0.4.0",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vite-plugin-singlefile": "^2.3.4",
+    "vitest": "^5.0.5"
+  }
+}
