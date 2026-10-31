@@ -3,6 +3,7 @@
 package com.ichi2.anki
 
 import android.view.View
+import android.content.Intent
 import androidx.core.content.edit
 import androidx.core.view.GravityCompat
 import com.ichi2.anki.common.preferences.sharedPrefs
@@ -47,7 +48,6 @@ class FlashiScreenshotTest : ScreenshotTest() {
             val card = note.firstCard()
             col.db.execute("update cards set id=?, due=? where id=?", entry.getLong("cardId"), i + 1, card.id)
         }
-        col.sched.reset()
     }
 
     private fun frame(name: String, card: View? = null) {
@@ -83,7 +83,6 @@ class FlashiScreenshotTest : ScreenshotTest() {
     private fun reviewer(name: String, answer: Boolean = false, cloze: Boolean = false, overflow: Boolean = false) {
         loadFixture()
         col.decks.select(col.decks.id(if (cloze) "Languages::Cloze" else "Languages::French"))
-        col.sched.reset()
         val reviewer = ReviewerTest.startReviewer(this)
         advanceRobolectricLooper()
         if (answer) reviewer.displayCardAnswer()
@@ -95,4 +94,10 @@ class FlashiScreenshotTest : ScreenshotTest() {
     @Test fun clozeQuestion() = reviewer("cloze-question", cloze = true)
     @Test fun clozeAnswer() = reviewer("cloze-answer", answer = true, cloze = true)
     @Test fun overflow() = reviewer("overflow", overflow = true)
+    @Test fun congrats() {
+        loadFixture()
+        col.decks.select(col.decks.id("Finished"))
+        startActivityNormallyOpenCollectionWithIntent(StudyOptionsActivity::class.java, Intent())
+        frame("congrats")
+    }
 }

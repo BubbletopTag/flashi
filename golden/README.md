@@ -19,10 +19,10 @@ with the canonical reference files. GitHub must allow Actions to create PRs.
 No Android emulator is required. The JVM workflow needs JDK 21 and network
 access for Gradle/Android/Robolectric dependencies.
 
-The native test covers nine screens. The Flashi congratulations page has no
-matching native reviewer screen (AnkiDroid returns to its study options); its
-reference is intentionally pending until an equivalent StudyOptions capture is
-selected. Robolectric does not render WebView card HTML, so native card bounds
+The native test covers ten screens. The congratulations reference captures
+AnkiDroid’s StudyOptions screen for the empty Finished deck, which is the native
+equivalent of returning from a completed reviewer. Differences in that flow
+remain visible in the report. Robolectric does not render WebView card HTML, so native card bounds
 are masked when comparing reviewer chrome. Web card content is still visible
 in the report and covered by template tests. Masks in `masks/` use CSS px / dp;
 keep their reason explicit and do not hide unexplained layout differences.

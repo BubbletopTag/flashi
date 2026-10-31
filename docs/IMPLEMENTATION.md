@@ -47,10 +47,10 @@ use OPFS. Test installation/offline mode over HTTPS or on localhost.
   images, audio, and scheduling against official Anki 26.9.3.
 - Android baseline generation is a manual GitHub workflow. No Android references
   are checked in yet; preview generation is not a visual-parity pass. Extra tests
-  cover nine native screens. The congratulations page needs a matched native
-  StudyOptions reference before its comparison can be accepted. See golden/README.md.
-- Pages deployment depends on enabling GitHub Pages with GitHub Actions in the
-  repository settings. Local builds and CI do not themselves confirm deployment.
+  cover ten native screens, using the empty-deck StudyOptions screen for the
+  native congratulations state. See golden/README.md.
+- GitHub Pages has been enabled for Actions at https://bubbletoptag.github.io/flashi/.
+  Deployment is verified separately from local builds.
 
 The original scope exclusions remain: AnkiWeb sync, FSRS, custom/filtered study,
 image occlusion editing, card browser/editor and the other Phase 4 features.

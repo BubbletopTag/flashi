@@ -47,7 +47,7 @@ jobs:
           TZ: UTC
       - name: Record screenshots
         working-directory: ankidroid
-        run: ./gradlew recordScreenshots -Pscreenshot -Ptheme=light -Pdevice=phone --stacktrace
+        run: ./gradlew :AnkiDroid:recordRoborazziPlayDebug -Pscreenshot -Ptheme=light -Pdevice=phone --tests com.ichi2.anki.FlashiScreenshotTest --stacktrace
         env:
           TZ: UTC
       - uses: actions/upload-artifact@v4
