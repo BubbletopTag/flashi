@@ -249,6 +249,7 @@ export class AppController {
   // ------------------------------------------------------------ import / export
 
   async importFile(file: Blob, onProgress: (p: ImportProgress) => void): Promise<ImportResult> {
+    if (file.size === 0) throw new Error("This file is empty or hasn't finished downloading. Save a local copy in Files, then try again.");
     if (file.size > MAX_IMPORT_BYTES) {
       throw new Error("This file is larger than 500 MB, which is more than Flashi can import.");
     }

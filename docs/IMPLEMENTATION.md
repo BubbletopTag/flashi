@@ -41,12 +41,24 @@ use OPFS. Test installation/offline mode over HTTPS or on localhost.
 - `npm run typecheck` passes.
 - All 93 unit tests pass with `FLASHI_ANKI_PYTHON=.venv/bin/python`, including
   live official-Anki queue/export comparisons.
-- All nine Chromium browser scenarios pass against both release builds.
+- All ten Chromium browser scenarios pass against both release builds.
 - `npm run golden` generates all ten previews; missing Android references are
   reported as pending rather than parity passes.
 - CI and Pages deployment pass on GitHub. The published site was opened in
   Chromium, its service worker installed, and it reloaded successfully offline
   with no page errors: https://bubbletoptag.github.io/flashi/.
+
+## iPhone follow-ups
+
+- The user confirmed the Home Screen top blur cleared after adding a real solid
+  viewport-fixed status strip, removing root scrolling, and including the Apple
+  app metadata in the shared HTML used by the local server as well as releases.
+- Import no longer filters the native picker by unknown `.apkg` extensions.
+  The selected file stays attached to its input during asynchronous archive
+  reads; it is reset only before the next picker opens. A regression scenario
+  models a file provider revoking access when that selection is cleared.
+- Empty/unreadable files now have actionable local-download errors. Confirmation
+  with the user's actual iPhone deck remains pending.
 
 ## External validation still required
 
@@ -57,8 +69,11 @@ use OPFS. Test installation/offline mode over HTTPS or on localhost.
 - A user-provided real AnkiWeb deck with images/audio and physical iPhone Safari
   testing are still needed. Generated fixtures cover legacy/current exports,
   images, audio, and scheduling against official Anki 26.9.3.
-- Android baseline generation is a manual GitHub workflow. No Android references
-  are checked in yet; preview generation is not a visual-parity pass. Extra tests
+- Android reference generation has passed in GitHub Actions (run 41170381209).
+  The reference branch is `golden/refresh-android`; the repository blocks Actions
+  from opening PRs, so the workflow provides a manual compare link. Exact visual
+  parity is still incomplete: the local report currently passes decks and
+  congratulations, with eight other screens over the initial 5% budget. Extra tests
   cover ten native screens, using the empty-deck StudyOptions screen for the
   native congratulations state. See golden/README.md.
 - GitHub Pages has been enabled for Actions at https://bubbletoptag.github.io/flashi/.

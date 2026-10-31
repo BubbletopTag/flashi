@@ -51,7 +51,8 @@ export function App({ app }: { app: AppController }) {
       setScreen({ name: "decks" });
       showMessage(`Imported ${result.notesAdded} ${result.notesAdded === 1 ? "note" : "notes"}${result.notesUpdated ? `, updated ${result.notesUpdated}` : ""}${result.mediaAdded ? `, ${result.mediaAdded} media files` : ""}.`);
     } catch (e) {
-      setModal({ kind: "message", title: "Import failed", text: e instanceof Error ? e.message : String(e) });
+      const unreadable = e instanceof DOMException && ["NotReadableError", "NotFoundError", "SecurityError"].includes(e.name);
+      setModal({ kind: "message", title: "Import failed", text: unreadable ? "The browser couldn't read this file. In Files, download or copy it to On My iPhone, then try importing that local copy." : e instanceof Error ? e.message : String(e) });
     }
   };
 
@@ -77,7 +78,14 @@ export function App({ app }: { app: AppController }) {
   const openImport = () => {
     setFabOpen(false);
     setDrawer(false);
-    fileInput.current?.click();
+    const input = fileInput.current;
+    if (input) {
+      // Reset before opening, so choosing the same file fires change again.
+      // Keep the selection alive during all asynchronous reads: clearing it in
+      // onChange can revoke Safari's access to the selected file.
+      input.value = "";
+      input.click();
+    }
   };
 
   const days = app.daysSinceBackup();
@@ -208,13 +216,12 @@ export function App({ app }: { app: AppController }) {
         ref={fileInput}
         id="import-file"
         type="file"
-        accept=".apkg,.colpkg,.zip"
+        aria-label="Import Anki deck or backup"
         class="visually-hidden"
         tabIndex={-1}
         onChange={(e) => {
           const input = e.currentTarget as HTMLInputElement;
           pickFile(input.files?.[0]);
-          input.value = "";
         }}
       />
       {modal?.kind === "createDeck" ? (

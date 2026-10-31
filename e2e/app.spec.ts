@@ -154,3 +154,19 @@ test('PWA migrates collection and media from IndexedDB, then exports automatic b
   await page.getByRole('button', { name: /Download this backup/ }).first().click();
   expect((await download).suggestedFilename()).toContain('automatic.apkg');
 });
+
+test('import retains the browser file grant through asynchronous archive reads', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = Blob.prototype.slice;
+    Blob.prototype.slice = function (...args: Parameters<Blob['slice']>) {
+      // Model a file provider that revokes access when its picker selection is
+      // cleared. ZIP import needs multiple reads after the change handler ends.
+      if (this instanceof File && this.name.endsWith('.apkg') && !document.querySelector<HTMLInputElement>('#import-file')?.files?.length) {
+        throw new DOMException('File access was revoked', 'NotReadableError');
+      }
+      return original.apply(this, args);
+    };
+  });
+  await page.goto('/dist-pwa/');
+  await importDeck(page);
+});
