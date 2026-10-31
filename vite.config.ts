@@ -103,8 +103,6 @@ function pwa(): Plugin {
       return [
         { tag: "link", attrs: { rel: "manifest", href: "./manifest.webmanifest" }, injectTo: "head" },
         { tag: "link", attrs: { rel: "apple-touch-icon", href: "./icons/flashi-180.png" }, injectTo: "head" },
-        { tag: "meta", attrs: { name: "apple-mobile-web-app-capable", content: "yes" }, injectTo: "head" },
-        { tag: "meta", attrs: { name: "apple-mobile-web-app-status-bar-style", content: "default" }, injectTo: "head" },
       ];
     },
     generateBundle(_options, bundle) {

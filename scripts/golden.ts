@@ -52,7 +52,17 @@ try {
     const budget = 0.05;
     if (!reference) { results.push({ screen, status: 'Awaiting Android reference', budget }); continue; }
     const actual = PNG.sync.read(await readFile(`${report}/${screen}-flashi.png`));
-    if (actual.width !== reference.width || actual.height !== reference.height) throw new Error(`${screen}: density rounding produced unequal image dimensions`);
+    // Android floors fractional physical dimensions; Chromium rounds them.
+    // Compare their common area when the recorded DPR produces a one-pixel edge.
+    if (Math.abs(actual.width - reference.width) > 1 || Math.abs(actual.height - reference.height) > 1) throw new Error(`${screen}: density rounding produced unequal image dimensions`);
+    const commonWidth = Math.min(actual.width, reference.width);
+    const commonHeight = Math.min(actual.height, reference.height);
+    for (const source of [actual, reference]) {
+      if (source.width === commonWidth && source.height === commonHeight) continue;
+      const data = Buffer.alloc(commonWidth * commonHeight * 4);
+      for (let y = 0; y < commonHeight; y++) source.data.copy(data, y * commonWidth * 4, y * source.width * 4, (y * source.width + commonWidth) * 4);
+      source.width = commonWidth; source.height = commonHeight; source.data = data;
+    }
     await writeFile(`${report}/${screen}-android.png`, PNG.sync.write(reference));
     const config = JSON.parse(await readFile(`golden/masks/${screen}.json`, 'utf8')) as { rects: Rect[] };
     const rects = [...config.rects, ...(meta.cardMask ? [meta.cardMask as Rect] : [])];

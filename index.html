@@ -6,8 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="Free, open-source flashcards for your phone's browser. Imports Anki .apkg decks." />
     <meta name="theme-color" content="#4B662C" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   </head>
   <body>
+    <div id="status-bar-fill" aria-hidden="true"></div>
     <div id="app"><p class="loading">Loading…</p></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

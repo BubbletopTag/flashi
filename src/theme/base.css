@@ -14,7 +14,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; }
+html, body { height: 100%; margin: 0; overflow: hidden; }
 html { height: 100dvh; }
 body {
   background: var(--window-bg);
@@ -26,13 +26,15 @@ body {
   touch-action: manipulation;
   overscroll-behavior: none;
 }
-/* Paint the status-bar band in the app-bar colour (Android statusBarColor = colorPrimary). */
-body::before {
-  content: "";
+/* Use a real, painted viewport-fixed element for WebKit's top-edge detection.
+   Keeping a small solid strip even when safe-area-inset-top is zero also covers
+   Safari tabs. It blends into the opaque toolbar without intercepting touches. */
+#status-bar-fill {
   position: fixed;
   inset: 0 0 auto;
-  height: var(--safe-top);
+  height: max(6px, var(--safe-top));
   background: var(--primary);
+  pointer-events: none;
   z-index: 10;
 }
 button { font: inherit; color: inherit; }
