@@ -10,6 +10,7 @@ import { importPackage } from "../src/anki/apkg/import";
 import { bytesSource } from "../src/anki/apkg/zip";
 import { num, str } from "../src/anki/sqlite";
 import { MemoryMediaStore } from "../src/storage/media";
+import { saveNote } from "../src/anki/management/notes";
 
 const fixture = (name: string) => new Uint8Array(readFileSync(join(__dirname, "..", "fixtures", "decks", name)));
 
@@ -142,5 +143,17 @@ describe("apkg export", () => {
     expect(out.revlog).toBe(num(col.db.scalar("select count(*) from revlog")));
     expect(out.media).toEqual(["beep.wav", "green.png", "日本.png"]);
     expect(out.decks).toEqual(expect.arrayContaining(deckNames(col).filter((n) => n !== "Default")));
+  });
+  it.skipIf(!haveAnki)("exports newly authored basic, reversed and cloze notes to official Anki", async () => {
+    const col=await Collection.create();const deckId=col.addDeck('Authored locally');
+    for(const [name,fields] of [['Basic',['<b>A &amp; B</b>','Answer']],['Basic (and reversed card)',['Forward','Reverse']],['Cloze',['{{c1::One}} and {{c3::three}}','Extra']]] as const){
+      const model=Object.values(col.models).find(model=>model.name===name)!;
+      await saveNote(col,{modelId:Number(model.id),deckId,fields:[...fields],tags:'local::authored'});
+    }
+    const next=col.nextCard(deckId)!;col.answerCard(next.card.id,4,3000);
+    const blob=await exportPackage(col,new MemoryMediaStore());const path=join(mkdtempSync(join(tmpdir(),'flashi-authored-')),'authored.apkg');writeFileSync(path,new Uint8Array(await blob.arrayBuffer()));
+    const out=JSON.parse(execFileSync(python,[join(__dirname,'..','scripts','check-export.py'),path],{encoding:'utf8'}));
+    expect(out.notes).toBe(3);expect(out.cards).toHaveLength(5);expect(out.revlog).toBe(1);expect(out.decks).toContain('Authored locally');
+    expect(out.cards.map((row:unknown[])=>row.slice(0,10))).toEqual(cardSummary(col));col.db.close();
   });
 });

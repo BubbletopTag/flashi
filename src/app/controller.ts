@@ -17,12 +17,13 @@ export const WARN_IMPORT_BYTES = 100 * 1024 * 1024;
 const SAVE_DELAY_MS = 1500;
 
 export interface Prefs {
+  appearance: 'system' | 'light' | 'dark';
   showDeckTitle: boolean;
   showEta: boolean;
   autoplay: boolean;
 }
 
-const DEFAULT_PREFS: Prefs = { showDeckTitle: true, showEta: true, autoplay: true };
+const DEFAULT_PREFS: Prefs = { appearance: 'system', showDeckTitle: true, showEta: true, autoplay: true };
 
 export class AppController {
   private listeners = new Set<() => void>();

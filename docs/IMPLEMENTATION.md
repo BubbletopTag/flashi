@@ -36,12 +36,29 @@ use OPFS. Test installation/offline mode over HTTPS or on localhost.
 - Deterministic JSON fixture and ten web screen previews, pixelmatch/SSIM report,
   explicit masks, 5% initial budgets and strict missing-baseline option.
 
+## Local tools update
+
+- System/light/dark appearance, including imported-card night-mode classes.
+- Original inline SVG favicon in artifact and PWA builds.
+- Anki-style statistics panel layout and chart order: Today, Future Due, Calendar,
+  Reviews, Card Counts, Review Intervals, Card Ease, True Retention, Hourly
+  Breakdown, Answer Buttons, Added. Includes deck/history/range filters.
+- Card browser with quoted/boolean search, deck/tag/field/state/numeric filters,
+  sorting, preview, card information/history and undoable bulk management.
+- Local note add/edit with imported note types, cloze/reverse card generation,
+  media attachments, tags, duplicate warnings, preview and scheduling retention.
+- Deck options and shared presets, limits, step units, display order, sibling
+  burying, audio/timer settings, rename/move/delete and undo. Long-press a deck
+  to open its options, or use the navigation drawer.
+- New notes and edits export successfully into official Anki.
+- Full AnkiDroid feature parity is still in progress; see PARITY.md.
+
 ## Verification
 
 - `npm run typecheck` passes.
-- All 93 unit tests pass with `FLASHI_ANKI_PYTHON=.venv/bin/python`, including
+- All 102 unit tests pass with `FLASHI_ANKI_PYTHON=.venv/bin/python`, including
   live official-Anki queue/export comparisons.
-- All ten Chromium browser scenarios pass against both release builds.
+- All twelve Chromium browser scenarios pass against both release builds.
 - `npm run golden` generates all ten previews; missing Android references are
   reported as pending rather than parity passes.
 - CI and Pages deployment pass on GitHub. The published site was opened in
@@ -58,7 +75,7 @@ use OPFS. Test installation/offline mode over HTTPS or on localhost.
   reads; it is reset only before the next picker opens. A regression scenario
   models a file provider revoking access when that selection is cleared.
 - Empty/unreadable files now have actionable local-download errors. Confirmation
-  with the user's actual iPhone deck remains pending.
+  with the user's actual iPhone deck was confirmed successful.
 
 ## External validation still required
 

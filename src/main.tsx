@@ -4,9 +4,13 @@ import "@fontsource/roboto/latin-400.css";
 import "@fontsource/roboto/latin-500.css";
 import "@fontsource/roboto/latin-700.css";
 import "./theme/tokens.flashi.css";
+import "./theme/tokens.dark.css";
 import "./theme/base.css";
 import { App } from "./app/App";
 import { AppController } from "./app/controller";
+import { applyAppearance } from "./theme/appearance";
+
+applyAppearance("system");
 
 async function start(): Promise<void> {
   const root = document.getElementById("app")!;
@@ -18,6 +22,10 @@ async function start(): Promise<void> {
     const app = __FLASHI_GOLDEN__ && new URLSearchParams(location.search).get("fixture") === "golden"
       ? await (await import("./app/golden")).goldenApp()
       : await AppController.boot();
+    const updateAppearance = () => applyAppearance(app.prefs().appearance);
+    updateAppearance();
+    app.subscribe(updateAppearance);
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { updateAppearance(); app.notify(); });
     root.textContent = "";
     render(<App app={app} />, root);
   } catch (e) {

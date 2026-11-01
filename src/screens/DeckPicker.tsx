@@ -34,6 +34,7 @@ export function DeckPicker(props: {
   app: AppController;
   onStudy: (deckId: number) => void;
   fab: preact.ComponentChildren;
+  onOptions?: (deckId: number) => void;
 }) {
   const { app } = props;
   const [, force] = useState(0);
@@ -78,6 +79,7 @@ export function DeckPicker(props: {
               class={`deck-row ripple${node.deckId === current ? " current" : ""}`}
               onPointerDown={ripple}
               onClick={() => props.onStudy(node.deckId)}
+              onContextMenu={(event) => {event.preventDefault();props.onOptions?.(node.deckId);}}
               data-deck-id={node.deckId}
             >
               {hasSubdecks ? (

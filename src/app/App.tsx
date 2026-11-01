@@ -6,10 +6,14 @@ import { Congrats } from "../screens/Congrats";
 import { DeckPicker } from "../screens/DeckPicker";
 import { Reviewer } from "../screens/Reviewer";
 import { PwaNotices } from "../platform/pwa";
+import { Statistics } from "../screens/Statistics";
+import { Browser } from "../screens/Browser";
+import { DeckOptions } from "../screens/DeckOptions";
+import { NoteEditor } from "../screens/NoteEditor";
 import { WARN_IMPORT_BYTES, type AppController } from "./controller";
 import { Dialog, FlashiLogo, Icon, ripple, Snackbar, TextButton, Toolbar, type SnackbarMessage } from "./ui";
 
-type Screen = { name: "decks" } | { name: "review"; deckId: number } | { name: "congrats"; deckId: number } | { name: "settings" } | { name: "about" };
+type Screen = { name: "decks" } | { name: "review"; deckId: number } | { name: "congrats"; deckId: number } | { name: "settings" } | { name: "about" } | { name: "statistics" } | { name: "deckOptions"; deckId?: number } | { name: "browser"; query?: string } | { name: "editor"; noteId?: number; returnTo?: Screen };
 
 type Modal =
   | { kind: "createDeck" }
@@ -97,6 +101,7 @@ export function App({ app }: { app: AppController }) {
       <div class="fab-area">
         {fabOpen ? (
           <>
+            <button type="button" class="fab-action ripple" id="fab-add-note" onPointerDown={ripple} onClick={() => { setFabOpen(false); setScreen({ name: 'editor', returnTo: { name: 'decks' } }); }}><Icon name="edit" /> Add note</button>
             <button type="button" class="fab-action ripple" id="fab-import" onPointerDown={ripple} onClick={openImport}>
               <Icon name="download" /> Import
             </button>
@@ -139,7 +144,7 @@ export function App({ app }: { app: AppController }) {
               <TextButton label="Export" onClick={() => void exportBackup()} />
             </div>
           ) : null}
-          <DeckPicker app={app} fab={fab} onStudy={(deckId) => setScreen({ name: "review", deckId })} />
+          <DeckPicker app={app} fab={fab} onOptions={(deckId) => setScreen({ name: "deckOptions", deckId })} onStudy={(deckId) => setScreen({ name: "review", deckId })} />
         </div>
       );
       break;
@@ -149,6 +154,8 @@ export function App({ app }: { app: AppController }) {
           app={app}
           deckId={screen.deckId}
           onBack={() => setScreen({ name: "decks" })}
+          onEdit={(noteId) => setScreen({ name: 'editor', noteId, returnTo: screen })}
+          onBrowse={(query) => setScreen({ name: 'browser', query })}
           onFinished={() => setScreen({ name: "congrats", deckId: screen.deckId })}
           showMessage={(text, action) => showMessage(text, action ? { label: action.label, onClick: () => { action.onClick(); setScreen({ name: "review", deckId: screen.deckId }); } } : undefined)}
         />
@@ -166,6 +173,18 @@ export function App({ app }: { app: AppController }) {
       break;
     case "settings":
       body = <Settings app={app} onMenu={() => setDrawer(true)} onExport={() => void exportBackup()} onImport={openImport} onAbout={() => setScreen({ name: "about" })} onDelete={() => setModal({ kind: "deleteData" })} />;
+      break;
+    case "deckOptions":
+      body = <DeckOptions app={app} initialDeck={screen.deckId} onBack={() => setScreen({name:"decks"})} onBrowse={(query)=>setScreen({name:"browser",query})} onStudy={(deckId)=>setScreen({name:"review",deckId})} />;
+      break;
+    case "statistics":
+      body = <Statistics app={app} onMenu={() => setDrawer(true)} onBrowse={(query) => setScreen({ name: "browser", query })} />;
+      break;
+    case "browser":
+      body = <Browser key={screen.query ?? 'all'} app={app} initialQuery={screen.query} onMenu={() => setDrawer(true)} onEdit={(noteId) => setScreen({ name: 'editor', noteId, returnTo: screen })} onAdd={() => setScreen({ name: 'editor', returnTo: screen })} />;
+      break;
+    case "editor":
+      body = <NoteEditor key={screen.noteId ?? 'new'} app={app} noteId={screen.noteId} onBack={() => setScreen(screen.returnTo ?? { name: 'browser' })} onSaved={() => { setScreen(screen.returnTo ?? { name: 'browser' }); showMessage('Note saved'); }} />;
       break;
     case "about":
       body = <About onBack={() => setScreen({ name: "settings" })} />;
@@ -193,9 +212,15 @@ export function App({ app }: { app: AppController }) {
               </div>
             </div>
             <nav>
+              <button type="button" class={`drawer-item ripple${screen.name === "browser" ? " active" : ""}`} onPointerDown={ripple} onClick={() => go({ name: "browser" })}><Icon name="list" /> Card browser</button>
+              <button type="button" class="drawer-item ripple" onPointerDown={ripple} onClick={() => go({ name: "editor", returnTo: { name: 'decks' } })}><Icon name="edit" /> Add note</button>
+              <button type="button" class={`drawer-item ripple${screen.name === "statistics" ? " active" : ""}`} onPointerDown={ripple} onClick={() => go({ name: "statistics" })}>
+                <Icon name="stats" /> Statistics
+              </button>
               <button type="button" class={`drawer-item ripple${screen.name === "decks" ? " active" : ""}`} onPointerDown={ripple} onClick={() => go({ name: "decks" })}>
                 <Icon name="list" /> Decks
               </button>
+              <button type="button" class={`drawer-item ripple${screen.name === "deckOptions" ? " active" : ""}`} onPointerDown={ripple} onClick={() => go({name:"deckOptions"})}><Icon name="settings" /> Deck options</button>
               <button type="button" class="drawer-item ripple" onPointerDown={ripple} onClick={openImport}>
                 <Icon name="download" /> Import
               </button>

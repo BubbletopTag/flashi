@@ -1,0 +1,22 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* AnkiDroid Dark surface/semantic colors at the pinned ref, with Flashi's
+   own green accent. Keep native card night-mode classes for deck styles. */
+:root[data-color-mode="dark"] {
+  --primary: #B3D58F; --on-primary: #FFFFFF; --primary-dark: #263D12;
+  --app-bar: #3D3D3D; --accent: #B3D58F;
+  --window-bg: #303030; --on-surface: #FFFFFF; --on-surface-variant: #D4D4D4;
+  --surface-variant: #3B4633; --surface-container: #353A31;
+  --surface-container-high: #424C3B; --outline-variant: #777E71;
+  --current-deck-bg: #393939; --topbar: #424242;
+  --fab: #4B662C; --on-fab: #FFFFFF; --divider: #505050;
+  --count-new: #9FA8DA; --count-learn: #EF9A9A; --count-review: #A5D6A7;
+  --count-zero: #777777;
+  --btn-again: #C62828; --btn-hard: #37474F; --btn-good: #2E7D32; --btn-easy: #0277BD;
+  --btn-again-pressed: #D32F2F; --btn-hard-pressed: #455A64; --btn-good-pressed: #388E3C; --btn-easy-pressed: #0288D1;
+  --show-answer: #37474F; --show-answer-pressed: #455A64;
+  --text: #FFFFFF; --text-secondary: #D4D4D4; --dyn-deck: #78CAFF;
+  --snackbar: #CFCFCF; --snackbar-action: #1E520B; --scrim: rgba(0,0,0,.6);
+  color-scheme: dark;
+}
+:root[data-color-mode="dark"] .snackbar { color: #202020; }
+:root[data-color-mode="dark"] .card-area iframe { background: #303030; }

@@ -62,6 +62,7 @@ export function rowToNote(r: Row): Note {
 export const nowSecs = (): number => Math.floor(Date.now() / 1000);
 
 interface UndoEntry {
+  restore?: () => void;
   label: string;
   cards: Card[];
   revlogIds: number[];
@@ -621,11 +622,16 @@ export class Collection {
     return this.undoStack[this.undoStack.length - 1]?.label ?? null;
   }
 
+  registerUndo(label: string, restore: () => void): void {
+    this.pushUndo({ label, cards: [], revlogIds: [], restore });
+  }
+
   /** Undo the last study action; returns the label, or null if nothing to undo. */
   undo(): string | null {
     const entry = this.undoStack.pop();
     if (!entry) return null;
     this.db.transaction(() => {
+      entry.restore?.();
       for (const c of entry.cards) this.updateCard(c);
       for (const id of entry.revlogIds) this.db.exec("delete from revlog where id = ?", [id]);
       for (const n of entry.notes ?? []) this.db.exec("update notes set tags = ?, mod = ? where id = ?", [n.tags, n.mod, n.id]);

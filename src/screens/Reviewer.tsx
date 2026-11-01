@@ -10,6 +10,7 @@ import { AudioPlayer } from "../app/audio";
 import { buildCardDocument } from "../app/cardFrame";
 import type { AppController } from "../app/controller";
 import { Icon, IconButton, PopupMenu, ripple, Toolbar, type MenuItem } from "../app/ui";
+import { setNoteTags } from '../anki/management/notes';
 
 export const FLAGS = [
   { value: 1, name: "Red", color: "var(--flag-red)" },
@@ -44,11 +45,14 @@ export function Reviewer(props: {
   deckId: number;
   onBack: () => void;
   onFinished: () => void;
+  onEdit: (noteId: number) => void;
+  onBrowse: (query: string) => void;
   showMessage: (text: string, action?: { label: string; onClick: () => void }) => void;
 }) {
   const { app, deckId } = props;
   const col = app.col;
   const prefs = app.prefs();
+  const dark = document.documentElement.dataset.colorMode === 'dark';
   const audio = useMemo(() => new AudioPlayer(app.store.media), []);
   const [queued, setQueued] = useState<QueuedCard | null>(null);
   const [content, setContent] = useState<CardContent | null>(null);
@@ -90,7 +94,7 @@ export function Reviewer(props: {
     if (!content || !queued) return;
     let cancelled = false;
     const body = side === "q" ? content.question : answerWithTyped(content, typed);
-    void buildCardDocument({ body, css: content.css, ord: content.ord, side, media: app.store.media }).then((html) => {
+    void buildCardDocument({ body, css: content.css, ord: content.ord, side, media: app.store.media, bodyClass: dark ? 'nightMode night_mode' : '' }).then((html) => {
       if (cancelled) return;
       setDoc(html);
       if (config.autoplay && prefs.autoplay) void audio.play(side === "q" ? content.questionAv : content.answerAv);
@@ -98,7 +102,7 @@ export function Reviewer(props: {
     return () => {
       cancelled = true;
     };
-  }, [content, side]);
+  }, [content, side, dark]);
 
   // Messages from the sandboxed card frame.
   useEffect(() => {
@@ -228,6 +232,9 @@ export function Reviewer(props: {
               anchor: e.currentTarget as HTMLElement,
               label: "Flag card",
               items: [
+                { label: "Edit note", icon: "edit", onSelect: () => props.onEdit(queued.card.nid) },
+                { label: "Card browser", icon: "list", onSelect: () => props.onBrowse(`cid:${queued.card.id}`) },
+                { label: "Mark / unmark note", icon: "star", onSelect: () => { const note = col.getNote(queued.card.nid); const marked = note?.tags.toLowerCase().split(/\s+/).includes('marked'); setNoteTags(col, [queued.card.nid], marked ? [] : ['marked'], marked ? ['marked'] : []); app.changed(); props.showMessage(marked ? 'Note unmarked' : 'Note marked'); } },
                 { label: "No flag", icon: "flag", iconColor: "#D3D3D3", onSelect: () => setFlag(0) },
                 ...FLAGS.map((f) => ({ label: `${f.name} flag`, icon: "flag" as const, iconColor: f.color, onSelect: () => setFlag(f.value) })),
               ],

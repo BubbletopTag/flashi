@@ -6,7 +6,7 @@
 
 import type { Collection } from "../collection";
 import type { Json } from "../config";
-import { splitFields, splitTags, type Card } from "../model";
+import { splitFields, splitTags, type Card, type Note } from "../model";
 import { extractClozeForTyping } from "./cloze";
 import { renderCard, TemplateError } from "./template";
 import { compareAnswer } from "./typeanswer";
@@ -62,6 +62,10 @@ function extractAv(html: string, side: "q" | "a", tags: AvTag[]): string {
 export function renderCardContent(col: Collection, card: Card): CardContent {
   const note = col.getNote(card.nid);
   const model = note ? col.model(note.mid) : null;
+  return renderNoteContent(col, card, note, model);
+}
+
+export function renderNoteContent(col: Collection, card: Card, note: Pick<Note, 'flds' | 'tags'> | null, model: Json): CardContent {
   if (!note || !model) {
     const msg = "<div>This card's note or note type is missing.</div>";
     return { question: msg, answer: msg, css: "", ord: card.ord, questionAv: [], answerAv: [], typeAnswer: null };

@@ -43,6 +43,7 @@ export function Settings(props: { app: AppController; onMenu: () => void; onExpo
     <div class="screen">
       <Toolbar title="Settings" nav={{ icon: "menu", label: "Open menu", onClick: props.onMenu }} />
       <div class="content-page">
+        <section class="pref-group"><h3>Appearance</h3><label class="pref"><div class="body"><div class="label">Theme</div><div class="summary">Follow your device, or choose light or dark.</div></div><select aria-label="Appearance" value={prefs.appearance} onChange={(event) => void app.setPref('appearance', event.currentTarget.value as 'system' | 'light' | 'dark')}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label></section>
         <section class="pref-group">
           <h3>Your data</h3>
           <div class="pref">

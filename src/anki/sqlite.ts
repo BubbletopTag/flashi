@@ -6,6 +6,7 @@
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import { sqliteWasmBytes } from "#wasm-source";
 import { fnvHashI64 } from "./rng";
+import { stripHtml } from "./template/text";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Sqlite3 = any;
@@ -89,6 +90,9 @@ export class Db {
 
   private registerExtensions(): void {
     const { capi, wasm } = this.sqlite3;
+    this.db.createFunction({ name: 'flashi_text', arity: 1, deterministic: true, xFunc: (_ctx: number, value: unknown) => stripHtml(String(value ?? '')) });
+    this.db.createFunction({ name: 'flashi_lower', arity: 1, deterministic: true, xFunc: (_ctx: number, value: unknown) => String(value ?? '').toLowerCase() });
+    this.db.createFunction({ name: 'flashi_field', arity: 2, deterministic: true, xFunc: (_ctx: number, value: unknown, index: unknown) => String(value ?? '').split('\x1f')[Number(index)] ?? '' });
     capi.sqlite3_create_collation_v2(
       this.db.pointer,
       "unicase",

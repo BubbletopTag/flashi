@@ -27,6 +27,7 @@
 //   star: AnkiDroid/src/main/res/drawable/ic_star.xml
 
 export const ICONS = {
+  stats: { viewBox: "0 0 24 24", paths: ["M3 13h4v8H3zM10 3h4v18h-4zM17 8h4v13h-4z"] },
   undo: { viewBox: "0 0 24 24", paths: ["M12.5,8c-2.65,0 -5.05,0.99 -6.9,2.6L2,7v9h9l-3.62,-3.62c1.39,-1.16 3.16,-1.88 5.12,-1.88 3.54,0 6.55,2.31 7.6,5.5l2.37,-0.78C21.08,11.03 17.15,8 12.5,8z"] },
   flagOutline: { viewBox: "0 0 24 24", paths: ["M14.4,6L14,4H5v17h3v-7h5.6l0.4,2h7V6z"] },
   flag: { viewBox: "0 0 24 24", paths: ["M14.4,6L14,4H5v17h2v-7h5.6l0.4,2h7V6z"] },

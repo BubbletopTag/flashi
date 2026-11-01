@@ -125,6 +125,7 @@ export async function buildCardDocument(opts: {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>${FLASHCARD_CSS}</style>
+${opts.bodyClass?.includes('nightMode') ? '<style>html{color-scheme:dark}.nightMode.card{color:#eee;background-color:#303030}</style>' : ''}
 <style>${css.replace(/<\/style/gi, "<\\/style")}</style>
 <script>${BRIDGE}</script>
 ${math}
