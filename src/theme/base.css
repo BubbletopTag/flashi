@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
 /* Layout and components. Dimensions follow AnkiDroid's layouts at
    golden/ANKIDROID_REF (1 dp = 1 CSS px, sp at font scale 1.0). Colours come
-   only from the theme tokens. Flashi is a deliberately single-theme (light)
-   app for now; a dark theme is Phase 4. */
+   from the theme tokens, including system/light/dark appearance. */
 
 :root {
   --toolbar-h: 56px;

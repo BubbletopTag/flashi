@@ -53,12 +53,25 @@ use OPFS. Test installation/offline mode over HTTPS or on localhost.
 - New notes and edits export successfully into official Anki.
 - Full AnkiDroid feature parity is still in progress; see PARITY.md.
 
+## FSRS update
+
+- FSRS-4.5/5/6 memory-state calculations using ts-fsrs 5.4.2, integrated with
+  Anki learning/relearning steps, interval fuzz, load balancing, leeches, history
+  and undo. Enable for all decks in Settings, with per-preset retention/weights.
+- Preserves imported memory states, infers missing state from history/SM-2, and
+  writes stability, difficulty, retention, decay and Anki revlog difficulty.
+- Stability/difficulty/retrievability graphs and hourly success-rate overlay.
+- Live official-Anki checks cover all four ratings on new/learning/review/
+  relearning cards, with and without steps, plus history-free SM-2 conversion.
+- Parameter optimization, bulk rescheduling, FSRS-7 and full history inference
+  edge-case parity remain outside this increment.
+
 ## Verification
 
 - `npm run typecheck` passes.
-- All 102 unit tests pass with `FLASHI_ANKI_PYTHON=.venv/bin/python`, including
+- All 104 unit tests pass with `FLASHI_ANKI_PYTHON=.venv/bin/python`, including
   live official-Anki queue/export comparisons.
-- All twelve Chromium browser scenarios pass against both release builds.
+- All thirteen Chromium browser scenarios pass against both release builds.
 - `npm run golden` generates all ten previews; missing Android references are
   reported as pending rather than parity passes.
 - CI and Pages deployment pass on GitHub. The published site was opened in
@@ -96,5 +109,7 @@ use OPFS. Test installation/offline mode over HTTPS or on localhost.
 - GitHub Pages has been enabled for Actions at https://bubbletoptag.github.io/flashi/.
   Deployment is verified separately from local builds.
 
-The original scope exclusions remain: AnkiWeb sync, FSRS, custom/filtered study,
-image occlusion editing, card browser/editor and the other Phase 4 features.
+The owner expanded the original scope to include local AnkiDroid features.
+AnkiWeb sync remains excluded. Still pending: custom/filtered study,
+image occlusion editing, note-type/template management, maintenance and the
+other unchecked features in PARITY.md.

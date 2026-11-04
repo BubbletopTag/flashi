@@ -46,5 +46,9 @@ FLASHI_ANKI_PYTHON=.venv/bin/python npm test
 
 See [the build brief](docs/SPEC.md), [handoff](docs/HANDOFF.md), and
 [visual test instructions](golden/README.md). Unsupported features include AnkiWeb
-sync, FSRS scheduling, filtered/custom study, image occlusion editing, and add-ons.
+sync, filtered/custom study, image occlusion editing, and add-ons.
+
+Recent local features include statistics, system/light/dark appearance, a card
+browser, note editing and media attachments, deck presets, and FSRS-4.5/5/6.
+See [the parity checklist](docs/PARITY.md) for the remaining local work.
 Keep exports from your original Anki collection when trying unfamiliar decks.

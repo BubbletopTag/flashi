@@ -76,7 +76,7 @@ function bundledNotices(): Plugin {
     resolveId: (id) => id === "virtual:third-party-notices" ? "\0" + id : null,
     load(id) {
       if (id !== "\0virtual:third-party-notices") return null;
-      const files = ["NOTICE.md", "LICENSE", ...["preact", "fflate", "fzstd", "mathjax", "@fontsource/roboto"].map((name) => `node_modules/${name}/LICENSE`)];
+      const files = ["NOTICE.md", "LICENSE", ...["preact", "ts-fsrs", "fflate", "fzstd", "mathjax", "@fontsource/roboto"].map((name) => `node_modules/${name}/LICENSE`)];
       const contents = files.map((file) => `${file}\n\n${readFileSync(file, "utf8")}`).join("\n\n────────────────────────────────\n\n");
       return `export default ${JSON.stringify(contents)}`;
     },

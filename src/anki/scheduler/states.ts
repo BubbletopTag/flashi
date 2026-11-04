@@ -21,6 +21,7 @@ export interface NewState {
 }
 
 export interface LearnState {
+  memory?: { stability: number; difficulty: number };
   kind: "learning";
   remainingSteps: number;
   scheduledSecs: number;
@@ -28,6 +29,7 @@ export interface LearnState {
 }
 
 export interface ReviewState {
+  memory?: { stability: number; difficulty: number };
   kind: "review";
   scheduledDays: number;
   elapsedDays: number;
@@ -212,7 +214,7 @@ export function minAndMaxReviewIntervals(ctx: StateContext, minimum: number): [n
   return [Math.min(Math.max(minimum, 1), maximum), maximum];
 }
 
-function ctxFuzz(ctx: StateContext, interval: number, minimum: number, maximum: number): number {
+export function ctxFuzz(ctx: StateContext, interval: number, minimum: number, maximum: number): number {
   const balanced = ctx.loadBalancer?.findInterval(interval, minimum, maximum) ?? null;
   return balanced ?? withReviewFuzz(ctx.fuzzFactor, interval, minimum, maximum);
 }

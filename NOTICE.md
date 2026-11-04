@@ -19,6 +19,7 @@ Versions resolved for JavaScript dependencies are recorded in package-lock.json.
 | [SQLite](https://sqlite.org/) | Database engine | Public domain; SQLite authors |
 | [SQLite WASM wrapper](https://github.com/sqlite/sqlite-wasm) | Official SQLite WebAssembly distribution and JavaScript integration | Apache-2.0; SQLite authors and wrapper contributors |
 | [Preact](https://github.com/preactjs/preact) | UI and hooks | MIT; Jason Miller and contributors |
+| [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs) | FSRS-6 memory-state calculations | MIT; Open Spaced Repetition |
 | [fflate](https://github.com/101arrowz/fflate) | ZIP and deflate | MIT; Arjun Barrett |
 | [fzstd](https://github.com/101arrowz/fzstd) | Zstandard decompression | MIT; Arjun Barrett |
 | [MathJax](https://github.com/mathjax/MathJax) | Card mathematics rendering | Apache-2.0; The MathJax Consortium |

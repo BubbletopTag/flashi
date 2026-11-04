@@ -4,6 +4,7 @@ import type { AppController } from "../app/controller";
 import { ripple, Switch, Toolbar } from "../app/ui";
 import { storageEstimate } from "../storage/store";
 import notices from "virtual:third-party-notices";
+import { fsrsAlgorithm } from '../anki/scheduler/fsrs';
 
 function bytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -18,6 +19,7 @@ export function Settings(props: { app: AppController; onMenu: () => void; onExpo
   const [backups, setBackups] = useState<number[]>([]);
   const [storageStatus, setStorageStatus] = useState("");
   const [backupStatus, setBackupStatus] = useState("");
+  const [schedulerError,setSchedulerError] = useState('');
   useEffect(() => {
     void (async () => {
       const media = await app.store.media.totalBytes().catch(() => 0);
@@ -44,6 +46,9 @@ export function Settings(props: { app: AppController; onMenu: () => void; onExpo
       <Toolbar title="Settings" nav={{ icon: "menu", label: "Open menu", onClick: props.onMenu }} />
       <div class="content-page">
         <section class="pref-group"><h3>Appearance</h3><label class="pref"><div class="body"><div class="label">Theme</div><div class="summary">Follow your device, or choose light or dark.</div></div><select aria-label="Appearance" value={prefs.appearance} onChange={(event) => void app.setPref('appearance', event.currentTarget.value as 'system' | 'light' | 'dark')}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label></section>
+        <section class="pref-group"><h3>Scheduling</h3><button type="button" class="pref ripple" role="switch" aria-label="FSRS" aria-checked={app.col.configBool('fsrs',false)} onPointerDown={ripple} onClick={()=>{
+          try{const enabled=!app.col.configBool('fsrs',false);if(enabled)for(const preset of Object.values(app.col.dconf))fsrsAlgorithm(preset);const before=app.col.configBool('fsrs',false);app.col.setConf('fsrs',enabled);app.col.invalidateQueue();app.col.registerUndo('Change scheduler',()=>{app.col.setConf('fsrs',before);app.col.invalidateQueue();});app.changed();setSchedulerError('');}catch(error){setSchedulerError(error instanceof Error?error.message:String(error));}
+        }}><div class="body"><div class="label">FSRS</div><div class="summary">Use FSRS for all decks. Set desired retention and parameters in Deck options. Existing due dates stay in place until each card is reviewed.</div></div><Switch on={app.col.configBool('fsrs',false)} /></button>{schedulerError?<p class="inline-error" role="alert">{schedulerError}</p>:null}</section>
         <section class="pref-group">
           <h3>Your data</h3>
           <div class="pref">

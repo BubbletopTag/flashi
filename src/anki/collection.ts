@@ -13,6 +13,7 @@ import { StudyQueue, type Counts, type QueueEntryKind } from "./scheduler/queue"
 import { localMinutesWest, schedTimingToday, v1CreationDate, type SchedTimingToday } from "./scheduler/timing";
 import { Db, num, str, type Row } from "./sqlite";
 import type { SchedulingStates } from "./scheduler/states";
+import { fsrsContext } from './scheduler/fsrs';
 
 export const SCHEMA11_SQL = `
 CREATE TABLE col (id integer PRIMARY KEY, crt integer NOT NULL, mod integer NOT NULL, scm integer NOT NULL,
@@ -415,7 +416,7 @@ export class Collection {
               q.loadBalancer!.findInterval(interval, min, max, dcid, seed, config.buryReviews ? card.nid : null),
           }
         : null;
-    return { config, timing, now, loadBalancer };
+    return { config, timing, now, loadBalancer, fsrs: fsrsContext(this,card,timing.nextDayAt) };
   }
 
   /** The study queue for `deckId`, rebuilt when stale. */

@@ -3,6 +3,7 @@
 // (Copyright: Ankitects Pty Ltd and contributors), SM-2 only.
 
 import type { DeckConfig } from "../config";
+import { fsrsNextStates, type FsrsContext } from './fsrs';
 import { CardQueue, CardType, parseCardData, serializeCardData, type Card, type RevlogEntry } from "../model";
 import { ChaCha12Rng, f32, randomRangeF32, randomRangeU32 } from "../rng";
 import {
@@ -46,6 +47,7 @@ export function learningIvlWithFuzz(seed: bigint | null, secs: number): number {
 }
 
 export interface AnswerContext {
+  fsrs?: FsrsContext;
   config: DeckConfig;
   timing: SchedTimingToday;
   /** Current time in seconds. */
@@ -133,7 +135,8 @@ export function currentCardState(card: Card, ctx: AnswerContext): CardState {
 }
 
 export function nextStatesFor(card: Card, ctx: AnswerContext): SchedulingStates {
-  return nextStates(currentCardState(card, ctx), stateContext(card, ctx));
+  const current=currentCardState(card,ctx),context=stateContext(card,ctx);
+  return ctx.fsrs ? fsrsNextStates(current,context,ctx.fsrs) : nextStates(current, context);
 }
 
 /** Labels for the four answer buttons ("<1m", "<6m", "<10m", "4d"). */
@@ -223,6 +226,9 @@ export function applyAnswer(
   if (leeched && ctx.config.leechAction === 0) card.queue = CardQueue.Suspended;
 
   data.lrt = Math.floor(answeredAtMs / 1000);
+  const memory=next.kind==='learning'||next.kind==='review'?next.memory:next.kind==='relearning'?next.review.memory:undefined;
+  if(memory&&ctx.fsrs){data.s=memory.stability;data.d=memory.difficulty;data.dr=ctx.fsrs.retention;data.decay=ctx.fsrs.decay;revlogEase=f32(f32(f32(memory.difficulty-1)/9)+f32(.1));}
+  else {delete data.s;delete data.d;delete data.dr;delete data.decay;}
   card.data = serializeCardData(data);
   card.mod = ctx.now;
   card.usn = -1;

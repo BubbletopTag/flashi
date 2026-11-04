@@ -3,6 +3,7 @@ import { CARD_COLUMNS, NOTE_COLUMNS, nowSecs, type Collection } from '../collect
 import type { Json } from '../config';
 import { deckIds } from '../scope';
 import { num } from '../sqlite';
+import { fsrsAlgorithm } from '../scheduler/fsrs';
 
 function changed(col: Collection) { col.markJsonDirty(); col.invalidateQueue(); }
 export function renameDeck(col: Collection, id: number, input: string): void {
@@ -58,6 +59,8 @@ export function saveDeckOptions(col:Collection,deckId:number,presetId:number,pre
     [preset.lapse.mult,0,1,'New interval'],[preset.lapse.minInt,1,36500,'Minimum interval'],[preset.lapse.leechFails,0,9999,'Leech threshold'],[preset.maxTaken,0,3600,'Maximum answer time'],
   ];
   for(const [value,min,max,label] of numbers)if(typeof value!=='number'||!Number.isFinite(value)||value<min||value>max)throw new Error(`${label} is outside the allowed range.`);
+  for(const value of [preset.desiredRetention??.9,preset.sm2Retention??.9])if(typeof value!=='number'||!Number.isFinite(value)||value<.7||value>.99)throw new Error('Retention must be between 70% and 99%.');
+  fsrsAlgorithm(preset);
   for(const value of [...preset.new.delays,...preset.lapse.delays])if(!Number.isFinite(value)||value<=0)throw new Error('Learning steps must be positive durations.');
   if(!preset.name?.trim())throw new Error('Enter a preset name.');
   col.dconf[String(presetId)]={...structuredClone(preset),id:presetId,mod:nowSecs(),usn:-1};

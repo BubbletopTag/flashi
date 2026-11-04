@@ -4,6 +4,7 @@
 import type { Collection } from './collection';
 import { cardScope } from './scope';
 import { num } from './sqlite';
+import { parseCardData } from './model';
 
 export interface StudyDay { date: string; count: number; milliseconds: number; learning: number; review: number; relearn: number }
 export interface Statistics {
@@ -21,6 +22,7 @@ export interface Statistics {
   added: number[];
   ease: number[];
   retention: { young: number[]; mature: number[] };
+  memory: { count: number; stability: number[]; difficulty: number[]; retrievability: number[]; averageRetrievability: number };
   currentStreak: number;
   longestStreak: number;
 }
@@ -43,13 +45,22 @@ export function statistics(col: Collection, deckId: number | null = null, days =
   const intervals = Array<number>(8).fill(0);
   const ease = Array<number>(9).fill(0);
   const added = Array<number>(365).fill(0);
+  const memory = { count:0,stability:Array<number>(8).fill(0),difficulty:Array<number>(10).fill(0),retrievability:Array<number>(10).fill(0),averageRetrievability:0 };
   const end = new Date(timing.nextDayAt * 1000);
   const calendarStart = new Date(end); calendarStart.setDate(calendarStart.getDate() - 365);
   const calendarKeys = new Map<string, number>();
   for (let i = 0; i < 365; i++) { const date = new Date(calendarStart); date.setDate(date.getDate() + i); calendarKeys.set(dayKey(date), i); }
   const noteIds = new Set<number>();
-  col.db.each(`select c.nid,c.type,c.queue,c.due,c.ivl,c.factor,c.id from cards c where ${scope.sql}`, scope.bind, (row) => {
-    const [nid, type, queue, due, interval, factor, id] = row.map((value) => num(value));
+  col.db.each(`select c.nid,c.type,c.queue,c.due,c.ivl,c.factor,c.id,c.data from cards c where ${scope.sql}`, scope.bind, (row) => {
+    const [nid, type, queue, due, interval, factor, id] = row.slice(0,7).map((value) => num(value));
+    const data=parseCardData(String(row[7]??''));
+    if(data.s&&data.s>0&&data.d&&data.d>=1){
+      memory.count++;
+      const bin=[1,7,21,30,90,180,365].findIndex(limit=>data.s!<=limit);memory.stability[bin<0?7:bin]=memory.stability[bin<0?7:bin]!+1;
+      const difficulty=Math.min(9,Math.max(0,Math.floor((data.d-1)/9*10)));memory.difficulty[difficulty]=memory.difficulty[difficulty]!+1;
+      const last=data.lrt??num(col.db.scalar('select max(id)/1000 from revlog where cid=? and ease between 1 and 4 and type between 0 and 3',[id!]));
+      if(last){const elapsed=Math.max(0,Math.floor((timing.nextDayAt-last)/86400)),decay=-(data.decay??.5);const factor=Math.pow(.9,1/decay)-1;const probability=Math.pow(1+factor*elapsed/data.s,decay);const bucket=Math.min(9,Math.max(0,Math.floor(probability*10)));memory.retrievability[bucket]=memory.retrievability[bucket]!+1;memory.averageRetrievability+=probability;}
+    }
     cards.total++; noteIds.add(nid!);
     const addedIndex = calendarKeys.get(studyDate(id!, rollover));
     if (addedIndex !== undefined) added[addedIndex] = added[addedIndex]! + 1;
@@ -106,7 +117,7 @@ export function statistics(col: Collection, deckId: number | null = null, days =
       if (ease > 1) hourlyCorrect[hour] = hourlyCorrect[hour]! + 1;
       const group = type === 0 || type === 2 ? 0 : mature ? 2 : 1;
       answerGroups[group]![ease - 1] = answerGroups[group]![ease - 1]! + 1;
-      if (type === 1 && num(row[5]) >= 1) { const bucket = mature ? retention.mature : retention.young; bucket[ease > 1 ? 0 : 1] = bucket[ease > 1 ? 0 : 1]! + 1; }
+      if (type === 1 || num(row[5]) >= 1 || num(row[5]) <= -86400) { const bucket = mature ? retention.mature : retention.young; bucket[ease > 1 ? 0 : 1] = bucket[ease > 1 ? 0 : 1]! + 1; }
       if (type === 1 || type === 3) { reviewTotal++; if (ease > 1) reviewSuccess++; }
     }
   });
@@ -122,5 +133,6 @@ export function statistics(col: Collection, deckId: number | null = null, days =
   for (let i = calendar.length - (calendar.at(-1)?.count ? 1 : 2); i >= 0 && calendar[i]!.count > 0; i--) currentStreak++;
   const history = [...buckets.values()].filter((day) => !days || day.date >= dayKey(start)).sort((a, b) => a.date.localeCompare(b.date));
   Object.assign(today, { answers: todayAnswers, cards: todayCards.size, milliseconds: todayMs });
-  return { cards, today, period: { answers: total, daysStudied: history.filter((day) => day.count > 0).length, milliseconds, reviewSuccess, reviewTotal }, calendar, history, forecast, answers, intervals, hours, hourlyCorrect, answerGroups, added, ease, retention, currentStreak, longestStreak };
+  memory.averageRetrievability/=Math.max(1,memory.retrievability.reduce((a,b)=>a+b,0));
+  return { cards, today, period: { answers: total, daysStudied: history.filter((day) => day.count > 0).length, milliseconds, reviewSuccess, reviewTotal }, calendar, history, forecast, answers, intervals, hours, hourlyCorrect, answerGroups, added, ease, retention, memory, currentStreak, longestStreak };
 }

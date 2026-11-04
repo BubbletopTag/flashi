@@ -239,3 +239,15 @@ test('deck presets, learning labels, rename and deletion undo work on mobile', a
   await expect(page.getByLabel('Options deck',{exact:true}).locator('option')).toContainText(['Default','Flashi Test','Flashi Test::Renamed']);
   await page.reload();await navigate('Deck options');await page.getByLabel('Options deck',{exact:true}).selectOption({label:'Flashi Test::Renamed'});await expect(page.getByLabel('Options preset',{exact:true}).locator('option:checked')).toHaveText('Mobile study');
 });
+
+test('FSRS can be enabled, reviewed, graphed and exported with memory states',async({page},testInfo)=>{
+  const navigate=async(name:string)=>{await page.getByRole('button',{name:'Open menu',exact:true}).click();await page.locator('.drawer').getByRole('button',{name,exact:true}).click();};
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('/dist-pwa/');await importDeck(page);await navigate('Settings');
+  await page.getByRole('switch',{name:'FSRS',exact:true}).click();await expect(page.getByRole('switch',{name:'FSRS',exact:true})).toHaveAttribute('aria-checked','true');
+  await navigate('Decks');await page.locator('.deck-row').filter({has:page.getByText('Many',{exact:true})}).click();await page.locator('#show-answer').click();await page.locator('#ease-4').click();await page.getByRole('button',{name:'Back to decks',exact:true}).first().click();
+  await navigate('Statistics');await expect(page.getByRole('heading',{name:'Card Stability',exact:true})).toBeAttached();await expect(page.getByRole('heading',{name:'Card Difficulty',exact:true})).toBeAttached();await expect(page.getByRole('heading',{name:'Card Retrievability',exact:true})).toBeAttached();
+  await navigate('Settings');const event=page.waitForEvent('download');await page.getByRole('button',{name:/^Export backup/}).click();const download=await event;const path=testInfo.outputPath('fsrs.apkg');await download.saveAs(path);
+  const entries=unzipSync(new Uint8Array(await readFile(path)));expect(entries['collection.anki21']).toBeDefined();
+  await page.reload();await navigate('Settings');await expect(page.getByRole('switch',{name:'FSRS',exact:true})).toHaveAttribute('aria-checked','true');expect(errors).toEqual([]);
+});
