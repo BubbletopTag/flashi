@@ -5,6 +5,10 @@ Sorry, I'll think of a better name eventually.
 A free, open-source flashcard app for your phone's browser, modeled on AnkiDroid.
 Add it to your Home Screen and study offline. Imports Anki `.apkg` decks.
 
+Also here: **Flashlet**, a Quizlet-style study app (Flashcards, Learn, Test, Match, Meteor), at
+[`/flashlet/`](https://bubbletoptag.github.io/flashi/flashlet/). It is a single self-contained page,
+`public/flashlet/index.html`, and saves decks and progress in the browser.
+
 ## Install on iPhone
 1. Open the site in Safari.
 2. Tap Share → **Add to Home Screen**.

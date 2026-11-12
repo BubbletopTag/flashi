@@ -126,6 +126,8 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.origin !== ROOT.origin || !url.pathname.startsWith(ROOT.pathname)) return;
+  // Flashlet is a separate app published under ./flashlet/; let it load from the network.
+  if (url.pathname.startsWith(ROOT.pathname + 'flashlet/') || url.pathname === ROOT.pathname + 'flashlet') return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     if (event.request.mode === 'navigate') return (await cache.match(ROOT.href)) || fetch(event.request);
