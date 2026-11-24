@@ -106,7 +106,9 @@ function pwa(): Plugin {
       ];
     },
     generateBundle(_options, bundle) {
-      const publicFiles = readdirSync("public", { recursive: true }).map(String).filter((name) => /\.(png|webmanifest)$/.test(name));
+      // Flashlet and Sub Bar are separate apps in their own folders; they are not part of Flashi's offline cache.
+      const publicFiles = readdirSync("public", { recursive: true }).map(String)
+        .filter((name) => /\.(png|webmanifest)$/.test(name) && !/^(flashlet|sub-bar)[\\/]/.test(name));
       const files = ["./", ...Object.keys(bundle), ...publicFiles];
       const hash = createHash("sha256");
       for (const [name, item] of Object.entries(bundle)) hash.update(name).update(item.type === "chunk" ? item.code : item.source);
@@ -126,8 +128,8 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.origin !== ROOT.origin || !url.pathname.startsWith(ROOT.pathname)) return;
-  // Flashlet is a separate app published under ./flashlet/; let it load from the network.
-  if (url.pathname.startsWith(ROOT.pathname + 'flashlet/') || url.pathname === ROOT.pathname + 'flashlet') return;
+  // Flashlet and Sub Bar are separate apps published under ./flashlet/ and ./sub-bar/; let them load from the network.
+  for (const app of ['flashlet', 'sub-bar']) if (url.pathname.startsWith(ROOT.pathname + app + '/') || url.pathname === ROOT.pathname + app) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     if (event.request.mode === 'navigate') return (await cache.match(ROOT.href)) || fetch(event.request);

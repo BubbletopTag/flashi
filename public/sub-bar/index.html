@@ -1,0 +1,459 @@
+<!doctype html>
+<!--standalone-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2b333a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sub Bar">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<!--/standalone-->
+<title>Sub Bar</title>
+<style>
+/* Layout: steel top bar, then one paper order ticket at a time. The red speaker circle is the whole game. */
+:root {
+  --bg: #e6e9ec; --panel: #ffffff; --ticket: #fffef8; --ink: #1b2126; --muted: #5d6872; --line: #d2d8dd;
+  --accent: #d63a29; --accent-deep: #a02416; --on-accent: #ffffff;
+  --ok: #23762f; --ok-bg: #dff1e2; --warn: #86570a; --warn-bg: #fcefcd; --bad: #b3281b; --bad-bg: #fbe1dc;
+  --steel: #2b333a; --on-steel: #f1f3f4; --shadow: rgba(20, 30, 40, .3);
+  --font: ui-rounded, "SF Pro Rounded", "Avenir Next", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12161a; --panel: #1c2227; --ticket: #232b31; --ink: #edf0f2; --muted: #9aa5ae; --line: #343f47;
+  --accent: #e84f3d; --accent-deep: #a8342a;
+  --ok: #62d27a; --ok-bg: #1b3523; --warn: #efc15b; --warn-bg: #3b2f12; --bad: #ff8374; --bad-bg: #3d201c;
+  --steel: #0d1114; --shadow: rgba(0, 0, 0, .65); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #12161a; --panel: #1c2227; --ticket: #232b31; --ink: #edf0f2; --muted: #9aa5ae; --line: #343f47;
+  --accent: #e84f3d; --accent-deep: #a8342a;
+  --ok: #62d27a; --ok-bg: #1b3523; --warn: #efc15b; --warn-bg: #3b2f12; --bad: #ff8374; --bad-bg: #3d201c;
+  --steel: #0d1114; --shadow: rgba(0, 0, 0, .65); color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.4 var(--font); -webkit-text-size-adjust: 100%; min-height: 100dvh; }
+button, input, textarea { font: inherit; color: inherit; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.top { background: var(--steel); color: var(--on-steel); padding-top: max(10px, env(safe-area-inset-top, 0px)); padding-bottom: 10px; }
+.top-in, .shell { max-width: 520px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.brand i { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; }
+.brand svg { width: 13px; height: 13px; color: #fff; }
+.stats { display: flex; gap: 14px; font: 600 13px var(--mono); font-variant-numeric: tabular-nums; }
+.stats b { font-weight: 800; }
+.stats[hidden] { display: none; }
+.shell { padding-block: 16px 36px; display: grid; gap: 14px; align-content: start; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 16px; }
+h1 { margin: 0 0 4px; font-size: 28px; line-height: 1.1; letter-spacing: -.02em; font-weight: 800; text-wrap: balance; }
+h2, h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+p { margin: 0; }
+.lede { color: var(--muted); margin-bottom: 14px; }
+.rules { margin: 0 0 16px; padding: 0; list-style: none; display: grid; gap: 10px; counter-reset: r; }
+.rules li { counter-increment: r; display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; }
+.rules li::before { content: counter(r); width: 26px; height: 26px; border-radius: 50%; background: var(--steel); color: var(--on-steel); font: 800 13px/26px var(--font); text-align: center; }
+.rules b { font-weight: 700; }
+.rules em { font-style: normal; font-weight: 700; color: var(--accent); }
+fieldset { border: 0; margin: 0 0 16px; padding: 0; }
+legend { padding: 0; margin-bottom: 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.seg { display: flex; gap: 8px; }
+.seg label { flex: 1; position: relative; }
+.seg input { position: absolute; opacity: 0; inset: 0; }
+.seg span { display: block; text-align: center; padding: 10px 6px; border: 1.5px solid var(--line); border-radius: 12px; font-weight: 800; cursor: pointer; line-height: 1.2; }
+.seg small { display: block; font-weight: 500; font-size: 12px; opacity: .75; }
+.seg input:checked + span { background: var(--steel); color: var(--on-steel); border-color: var(--steel); }
+.seg input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
+.best { margin-top: 12px; text-align: center; color: var(--muted); font-size: 14px; min-height: 1.4em; }
+
+.btn { min-height: 46px; border: 1.5px solid var(--ink); background: var(--panel); color: var(--ink); border-radius: 12px; padding: 0 18px; font-weight: 800; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent-deep); color: var(--on-accent); box-shadow: 0 3px 0 var(--accent-deep); }
+.btn.primary:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--accent-deep); }
+.btn.ghost { border-color: var(--line); }
+.btn.big { width: 100%; min-height: 54px; font-size: 18px; }
+.btn.small { min-height: 38px; padding: 0 14px; font-size: 14px; border-color: var(--line); }
+.btn:disabled { opacity: .45; cursor: default; }
+.link { background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; justify-self: center; padding: 8px; font-size: 14px; }
+button:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.prog { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); font-weight: 600; }
+.prog b { color: var(--ink); }
+.meter { flex: 1; height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--steel); border-radius: 99px; transition: width .3s; }
+
+/* the order ticket */
+.ticket { position: relative; background: var(--ticket); border: 1px solid var(--line); border-radius: 8px 8px 16px 16px; padding: 14px 16px 16px; box-shadow: 0 20px 30px -24px var(--shadow); }
+.ticket-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.no { font: 800 14px var(--mono); letter-spacing: .06em; color: var(--muted); }
+.mood { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14px; }
+.mood::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
+.mood[data-mood="impatient"]::before { background: #e0a419; }
+.mood[data-mood="gone"]::before { background: var(--bad); }
+.rule { border: 0; border-top: 2px dashed var(--line); margin: 14px -16px; position: relative; overflow: visible; height: 0; }
+.rule::before, .rule::after { content: ""; position: absolute; top: -11px; width: 20px; height: 20px; border-radius: 50%; background: var(--bg); }
+.rule::before { left: -10px; } .rule::after { right: -10px; }
+
+.speaker { display: grid; justify-items: center; gap: 22px; padding: 14px 0 6px; }
+.speak { position: relative; width: 148px; height: 148px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; cursor: pointer; box-shadow: 0 8px 0 var(--accent-deep), 0 22px 26px -12px var(--shadow); transition: transform .08s, box-shadow .08s; -webkit-tap-highlight-color: transparent; }
+.speak:active:not([aria-disabled="true"]) { transform: translateY(5px); box-shadow: 0 3px 0 var(--accent-deep), 0 12px 16px -10px var(--shadow); }
+.speak svg { width: 62px; height: 62px; }
+.speak::before, .speak::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--accent); opacity: 0; pointer-events: none; }
+.speaker[data-state="playing"] .speak::before { animation: ring 1.4s ease-out infinite; }
+.speaker[data-state="playing"] .speak::after { animation: ring 1.4s ease-out .7s infinite; }
+@keyframes ring { from { transform: scale(1); opacity: .7; } to { transform: scale(1.32); opacity: 0; } }
+.speaker[data-state="playing"] .speak { cursor: default; }
+.speaker[data-state="done"] .speak { background: var(--line); color: var(--muted); box-shadow: none; transform: translateY(8px); cursor: default; }
+.speak-label { font-weight: 700; text-align: center; min-height: 1.4em; }
+
+.log { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.log li { font-size: 14px; }
+.log .you { justify-self: end; background: var(--steel); color: var(--on-steel); padding: 7px 12px; border-radius: 14px 14px 4px 14px; max-width: 85%; overflow-wrap: anywhere; }
+.log .note { justify-self: center; text-align: center; color: var(--muted); font-style: italic; }
+.log .warn { color: var(--warn); font-style: normal; font-weight: 600; }
+.log .bad { color: var(--bad); font-style: normal; font-weight: 700; }
+.reply { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 14px; align-items: end; }
+.reply textarea { width: 100%; min-height: 48px; max-height: 120px; resize: none; padding: 11px 12px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--panel); font-size: 16px; line-height: 1.35; }
+.reply textarea:disabled { background: transparent; opacity: .6; }
+.hint { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.hint b { color: var(--ink); }
+.ticket.gone { animation: storm .9s ease-in forwards; transform-origin: 0 100%; }
+@keyframes storm { 30% { transform: rotate(-2deg); } to { transform: translateX(120%) rotate(8deg); opacity: 0; } }
+.ticket.shake { animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+/* result */
+.verdict { font-weight: 800; font-size: 14px; padding: 3px 10px; border-radius: 99px; }
+.verdict.ok { background: var(--ok-bg); color: var(--ok); }
+.verdict.warn { background: var(--warn-bg); color: var(--warn); }
+.verdict.bad { background: var(--bad-bg); color: var(--bad); }
+.scorebox { display: flex; align-items: baseline; justify-content: space-between; margin: 10px 0 4px; }
+.pct { font-size: 56px; line-height: 1; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.pct span { font-size: 24px; }
+.tip { font: 700 15px var(--mono); color: var(--muted); }
+.block { margin-top: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 99px; padding: 5px 11px; font-weight: 700; font-size: 14px; border: 1.5px solid var(--line); background: var(--panel); }
+.chip i { font-style: normal; font-weight: 800; }
+.chip small { font-weight: 600; font-size: 12px; opacity: .85; }
+.chip.ok { background: var(--ok-bg); border-color: transparent; color: var(--ok); }
+.chip.half { background: var(--warn-bg); border-color: transparent; color: var(--warn); }
+.chip.plain { color: var(--muted); }
+.chip.miss { border-style: dashed; border-color: var(--bad); color: var(--bad); background: transparent; }
+.chip.wrong { border-style: dashed; border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
+.said { margin-top: 14px; font-size: 15px; overflow-wrap: anywhere; }
+.said q { font-style: italic; }
+.heard { margin: 0 0 8px; font-size: 17px; font-weight: 600; }
+.row-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.next { margin-top: 18px; width: 100%; }
+
+/* report */
+.gradebox { display: flex; align-items: center; gap: 16px; }
+.grade { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; font-size: 52px; font-weight: 800; border: 5px solid var(--steel); flex: none; }
+.grade.A { border-color: var(--ok); color: var(--ok); } .grade.B { border-color: var(--ok); color: var(--ok); }
+.grade.C { border-color: #e0a419; color: var(--warn); } .grade.D, .grade.F { border-color: var(--bad); color: var(--bad); }
+.gradebox p { font-size: 15px; } .gradebox b { font-size: 22px; }
+.quip { margin: 14px 0; font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 0 0 6px; }
+.facts div { background: var(--bg); border-radius: 12px; padding: 10px 12px; }
+.facts dt { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.facts dd { margin: 2px 0 0; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rows { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+summary { list-style: none; cursor: pointer; padding: 11px 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+summary::-webkit-details-marker { display: none; }
+summary .no { font-size: 13px; }
+summary .what { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+summary .sc { font: 800 15px var(--mono); }
+summary .sc.bad { color: var(--bad); } summary .sc.ok { color: var(--ok); } summary .sc.warn { color: var(--warn); }
+details > div { padding: 0 12px 14px; }
+.end-btns { display: grid; gap: 8px; margin-top: 16px; }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<header class="top"><div class="top-in">
+  <div class="brand"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3z" fill="currentColor"/></svg></i>Sub Bar</div>
+  <div class="stats" id="stats" hidden></div>
+</div></header>
+<main class="shell" id="app"></main>
+
+<script src="data.js"></script>
+<script src="engine.js"></script>
+<script>
+(() => {
+  'use strict';
+  const app = document.getElementById('app');
+  if (!window.SUBBAR || !window.SubBarEngine) { app.textContent = 'Sub Bar could not load. Reload the page.'; return; }
+  const { menu, orders } = window.SUBBAR;
+  const E = SubBarEngine.create(menu);
+  const statsEl = document.getElementById('stats');
+  const money = n => '$' + n.toFixed(2);
+  const pad = n => String(n).padStart(2, '0');
+
+  const ICON = {
+    speaker: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.7 5.8a8.8 8.8 0 0 1 0 12.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  };
+  const svgEl = s => { const t = document.createElement('template'); t.innerHTML = s; return t.content.firstChild; };
+  function h(tag, props, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (k === 'class') el.className = v;
+      else if (k === 'text') el.textContent = v;
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else if (v !== false && v != null) el.setAttribute(k, v === true ? '' : v);
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(kid));
+    return el;
+  }
+
+  /* ---- what the browser remembers: best grade per shift length, how often each order came up ---- */
+  const KEY = 'subbar:v1';
+  const fresh = () => ({ best: {}, seen: {}, len: 10 });
+  const load = () => { try { return Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { return fresh(); } };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch { /* private window: fine */ } };
+  let saved = load();
+
+  /* ---- audio: one element, so the phone keeps letting us play after the first tap ---- */
+  const audio = new Audio();
+  audio.preload = 'auto';
+  function hear(order, rate) {
+    if (audio.getAttribute('src') !== order.file) audio.src = order.file;   // a new src resets the speed, so set it after
+    audio.defaultPlaybackRate = rate; audio.playbackRate = rate;
+    audio.preservesPitch = audio.webkitPreservesPitch = audio.mozPreservesPitch = true;
+    audio.currentTime = 0;
+    return audio.play();
+  }
+  audio.onplaying = () => { if (cur && !cur.done) { cur.heard = true; cur.playing = true; ui(); } };
+  audio.onended = () => { if (cur && !cur.done) { cur.playing = false; ui(); if (els.answer && !els.answer.disabled) els.answer.focus({ preventScroll: true }); } };
+  audio.onerror = () => audioFailed();
+  document.addEventListener('visibilitychange', () => { if (document.hidden) audio.pause(); });
+
+  /* ---- a shift and the customer in front of you ---- */
+  let shift = null, cur = null, els = {};
+
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  function setStats(on) {
+    statsEl.hidden = !on;
+    if (on) statsEl.replaceChildren(h('span', {}, 'Tips ', h('b', { text: money(shift.tips) })), h('span', {}, 'Streak ', h('b', { text: String(shift.streak) })));
+  }
+  const grade = avg => avg >= 90 ? 'A' : avg >= 80 ? 'B' : avg >= 70 ? 'C' : avg >= 60 ? 'D' : 'F';
+  const QUIPS = { A: 'Customers would line up for you.', B: 'Solid shift. A few orders got away.', C: 'You caught most of it. Listen for the ingredients.',
+    D: 'Rough shift. Slow down and listen for each word.', F: 'Everyone left hungry. Try a shorter shift and go again.' };
+
+  /* ---------------- home ---------------- */
+  function showHome() {
+    audio.pause(); shift = null; cur = null; setStats(false);
+    const lens = [[10, 'Quick'], [25, 'Half shift'], [50, 'Full day']];
+    const seg = h('div', { class: 'seg' }, lens.map(([n, name]) => h('label', {},
+      h('input', { type: 'radio', name: 'len', value: n, checked: saved.len === n, onchange: () => { saved.len = n; save(); showBest(); } }),
+      h('span', {}, String(n), h('small', { text: name })))));
+    const best = h('p', { class: 'best' });
+    const showBest = () => { const b = saved.best[saved.len]; best.textContent = b ? `Best ${saved.len}-customer shift: ${b.grade}, ${b.avg}%` : ''; };
+    showBest();
+    app.replaceChildren(h('section', { class: 'card' },
+      h('h1', { text: 'Take the orders.' }),
+      h('p', { class: 'lede', text: 'The customer speaks Spanish. You type what they want, in English.' }),
+      h('ol', { class: 'rules' },
+        h('li', {}, h('span', {}, h('b', { text: 'Listen once. ' }), 'Tap the speaker. There are no subtitles.')),
+        h('li', {}, h('span', {}, h('b', { text: 'Type it in English. ' }), 'Your phone keyboard’s dictation works too.')),
+        h('li', {}, h('span', {}, h('b', { text: 'Missed it? ' }), 'Ask in Spanish: ', h('em', { text: '¿puede repetir?' }), ' or ', h('em', { text: 'más despacio' }), ' (70% speed).')),
+        h('li', {}, h('span', {}, h('b', { text: 'Ask once, not twice. ' }), 'A second ask and they walk out. Gluten-free customers won’t wait at all.'))),
+      h('fieldset', {}, h('legend', { text: 'Shift length' }), seg),
+      h('button', { class: 'btn primary big', type: 'button', onclick: () => startShift(saved.len) }, 'Open the shop'),
+      best));
+  }
+
+  function startShift(n) {
+    const ranked = orders.map(o => [o, (saved.seen[o.id] || 0) + Math.random()]).sort((a, b) => a[1] - b[1]).map(x => x[0]);
+    shift = { queue: shuffle(ranked.slice(0, Math.min(n, ranked.length))), i: 0, results: [], tips: 0, streak: 0, bestStreak: 0, confirmEnd: false };
+    nextCustomer();
+  }
+  function nextCustomer() {
+    if (shift.i >= shift.queue.length) return showReport();
+    audio.pause();
+    cur = { order: shift.queue[shift.i], listened: false, heard: false, playing: false, asks: 0, mood: 'calm', done: false, log: [] };
+    renderOrder();
+  }
+
+  /* ---------------- the order ---------------- */
+  function renderOrder() {
+    setStats(true); shift.confirmEnd = false;
+    const N = shift.queue.length;
+    els = {};
+    els.speak = h('button', { class: 'speak', type: 'button', 'aria-label': 'Play the order', onclick: onSpeak }, svgEl(ICON.speaker));
+    els.label = h('p', { class: 'speak-label', 'aria-live': 'polite' });
+    els.speaker = h('div', { class: 'speaker' }, els.speak, els.label);
+    els.mood = h('span', { class: 'mood' });
+    els.log = h('ul', { class: 'log', 'aria-live': 'polite' });
+    els.answer = h('textarea', { id: 'answer', rows: 2, lang: 'en', placeholder: 'Listen first', autocomplete: 'off', autocapitalize: 'sentences', spellcheck: 'true', enterkeyhint: 'send', 'aria-label': 'What do they want? Answer in English.', disabled: true });
+    els.send = h('button', { class: 'btn primary', type: 'submit', disabled: true }, 'Send');
+    els.answer.addEventListener('input', () => { els.answer.style.height = 'auto'; els.answer.style.height = Math.min(els.answer.scrollHeight, 120) + 'px'; });
+    els.answer.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); onSend(); } });
+    els.ticket = h('article', { class: 'ticket' },
+      h('div', { class: 'ticket-head' }, h('span', { class: 'no', text: 'No. ' + pad(shift.i + 1) }), els.mood),
+      h('hr', { class: 'rule' }),
+      els.speaker, els.log,
+      h('form', { class: 'reply', onsubmit: e => { e.preventDefault(); onSend(); } }, els.answer, els.send),
+      h('p', { class: 'hint' }, 'Need it again? Type ', h('b', { text: '¿puede repetir?' }), ' or ', h('b', { text: 'más despacio' }), '.'));
+    els.end = h('button', { class: 'link', type: 'button', onclick: onEnd }, 'End shift');
+    app.replaceChildren(
+      h('div', { class: 'prog' }, h('span', {}, 'Customer ', h('b', { text: String(shift.i + 1) }), ' of ' + N), h('span', { class: 'meter' }, h('i', { style: `width:${shift.i / N * 100}%` }))),
+      els.ticket, els.end);
+    ui();
+  }
+
+  // Redraws everything that depends on the customer's state.
+  function ui() {
+    if (!cur || !els.speaker || cur.done) return;
+    const state = cur.playing ? 'playing' : cur.listened ? 'done' : 'ready';
+    els.speaker.dataset.state = state;
+    els.speak.setAttribute('aria-disabled', String(state !== 'ready'));
+    els.speak.replaceChildren(svgEl(state === 'done' ? ICON.check : ICON.speaker));
+    els.label.textContent = cur.leaving ? '' : state === 'ready' ? 'Tap to hear the order' : state === 'playing' ? 'Listening…'
+      : cur.asks ? 'Heard it again. Type what they want.' : 'You heard it. Type what they want.';
+    els.mood.dataset.mood = cur.mood;
+    els.mood.textContent = { calm: 'Calm', impatient: 'Impatient', gone: 'Gone' }[cur.mood];
+    const typing = cur.listened && !cur.leaving;
+    els.answer.disabled = !typing; els.send.disabled = !typing;
+    els.answer.placeholder = typing ? 'What do they want? (English)' : cur.leaving ? '' : 'Listen first';
+    els.log.replaceChildren(...cur.log.map(l => h('li', { class: l.kind + (l.tone ? ' ' + l.tone : ''), text: l.text })));
+  }
+  const say = (kind, text, tone) => { cur.log.push({ kind, text, tone }); };
+
+  function onSpeak() {
+    if (!cur || cur.done || cur.leaving) return;
+    if (cur.listened) {
+      if (!(cur.log.length && cur.log[cur.log.length - 1].text.startsWith('You only'))) {
+        say('note', 'You only hear it once. Ask: ¿puede repetir? or más despacio.', 'warn'); ui();
+      }
+      return;
+    }
+    cur.listened = true; ui();
+    hear(cur.order, 1).catch(audioFailed);
+  }
+  function audioFailed() {
+    if (!cur || cur.done) return;
+    cur.playing = false;
+    if (!cur.heard) { cur.listened = false; say('note', 'The audio would not play. Check your connection and tap the speaker again.', 'warn'); }
+    ui();
+  }
+
+  function onSend() {
+    if (!cur || cur.done || cur.leaving || !cur.listened) return;
+    const text = els.answer.value.trim();
+    if (!text) { els.ticket.classList.remove('shake'); void els.ticket.offsetWidth; els.ticket.classList.add('shake'); return; }
+    const c = E.classify(text);
+    if (c.kind === 'ask') return onAsk(c.ask, text);
+    if (c.kind === 'english-ask') {
+      say('note', 'The customer only speaks Spanish. Try ¿puede repetir? or más despacio.', 'warn'); els.answer.value = ''; ui(); return;
+    }
+    finish({ ...E.grade(cur.order, text, { asked: cur.asks > 0 }), text, walkout: false });
+  }
+
+  function onAsk(kind, text) {
+    say('you', text); els.answer.value = ''; els.answer.style.height = ''; cur.asks++;
+    const allowed = cur.order.gf ? 0 : 1;           // gluten-free customers don't tolerate even one
+    if (cur.asks > allowed) {
+      cur.mood = 'gone'; cur.leaving = true; audio.pause(); cur.playing = false;
+      say('note', cur.order.gf ? 'They won’t wait around. They storm out.' : 'That’s twice. They storm out.', 'bad');
+      ui(); els.ticket.classList.add('gone');
+      setTimeout(() => finish({ score: 0, matched: [], partial: [], missed: cur.order.want.slice(), wrong: [], text: '', walkout: true }), 950);
+      return;
+    }
+    cur.mood = 'impatient';
+    say('note', kind === 'slow' ? 'The customer sighs and repeats it slowly.' : 'The customer sighs and repeats the order.');
+    cur.playing = true; ui();
+    hear(cur.order, kind === 'slow' ? 0.7 : 1).catch(audioFailed);
+  }
+
+  function onEnd() {
+    if (!shift.confirmEnd) { shift.confirmEnd = true; els.end.textContent = 'Tap again to end the shift and see your grade'; return; }
+    audio.pause();
+    if (shift.results.length) showReport(); else showHome();
+  }
+
+  /* ---------------- after each customer ---------------- */
+  function finish(r) {
+    if (cur.done) return;
+    cur.done = true; audio.pause();
+    r.order = cur.order; r.asks = cur.asks;
+    r.tip = r.walkout ? 0 : +(r.score / 100 * 5).toFixed(2);
+    shift.tips += r.tip;
+    if (r.score >= 90) { shift.streak++; shift.bestStreak = Math.max(shift.bestStreak, shift.streak); } else shift.streak = 0;
+    shift.results.push(r);
+    saved.seen[r.order.id] = (saved.seen[r.order.id] || 0) + 1; save();
+    renderResult(r);
+  }
+  const verdict = r => r.walkout ? { text: 'Walked out', cls: 'bad' } : r.score >= 95 ? { text: 'Perfect', cls: 'ok' }
+    : r.score >= 75 ? { text: 'Good', cls: 'ok' } : r.score >= 50 ? { text: 'Close', cls: 'warn' } : { text: 'Missed', cls: 'bad' };
+
+  function chipsFor(r) {
+    const chip = (cls, mark, id, note) => h('li', { class: 'chip ' + cls }, mark ? h('i', { text: mark }) : null, E.labelOf(id), note ? h('small', { text: note }) : null);
+    return h('ul', { class: 'chips' },
+      r.walkout ? r.order.want.map(id => chip('plain', '', id)) : r.order.want.map(id => r.matched.includes(id) ? chip('ok', '✓', id) : r.partial.includes(id) ? chip('half', '½', id, 'which one?') : chip('miss', '✕', id)),
+      r.wrong.map(id => chip('wrong', '!', id, 'not ordered')));
+  }
+  function detail(r) {
+    return [
+      h('div', { class: 'block' }, h('h3', { text: 'They wanted' }), chipsFor(r)),
+      r.text ? h('p', { class: 'said' }, 'You wrote: ', h('q', { text: r.text })) : null,
+      h('div', { class: 'block' }, h('h3', { text: 'They said' }), h('p', { class: 'heard', lang: 'es', text: r.order.es }),
+        h('div', { class: 'row-btns' },
+          h('button', { class: 'btn small', type: 'button', onclick: () => hear(r.order, 1).catch(() => {}) }, 'Hear it'),
+          h('button', { class: 'btn small', type: 'button', onclick: () => hear(r.order, 0.7).catch(() => {}) }, 'Hear it slowly'))),
+    ];
+  }
+  function renderResult(r) {
+    setStats(true);
+    const v = verdict(r), last = shift.i + 1 >= shift.queue.length;
+    const next = h('button', { class: 'btn primary big next', type: 'button', onclick: () => { shift.i++; nextCustomer(); window.scrollTo(0, 0); } }, last ? 'See your grade' : 'Next customer');
+    app.replaceChildren(
+      h('div', { class: 'prog' }, h('span', {}, 'Customer ', h('b', { text: String(shift.i + 1) }), ' of ' + shift.queue.length),
+        h('span', { class: 'meter' }, h('i', { style: `width:${(shift.i + 1) / shift.queue.length * 100}%` }))),
+      h('article', { class: 'ticket', 'aria-live': 'polite' },
+        h('div', { class: 'ticket-head' }, h('span', { class: 'no', text: 'No. ' + pad(shift.i + 1) }), h('span', { class: 'verdict ' + v.cls, text: v.text })),
+        h('div', { class: 'scorebox' }, h('div', { class: 'pct' }, String(r.score), h('span', { text: '%' })),
+          h('div', { class: 'tip', text: r.walkout ? 'No tip' : '+' + money(r.tip) + ' tip' })),
+        r.walkout ? h('p', { class: 'said', text: 'They left before you answered.' }) : r.asks ? h('p', { class: 'said', text: 'You asked them to repeat, so this order tops out at 90.' }) : null,
+        detail(r), next));
+    next.focus({ preventScroll: true }); window.scrollTo(0, 0);
+  }
+
+  /* ---------------- end of shift ---------------- */
+  function showReport() {
+    audio.pause(); cur = null; setStats(true);
+    const rs = shift.results, n = rs.length;
+    const avg = Math.round(rs.reduce((s, r) => s + r.score, 0) / n), g = grade(avg);
+    const key = [10, 25, 50].includes(shift.queue.length) && n === shift.queue.length ? shift.queue.length : null;
+    let record = false;
+    if (key && (!saved.best[key] || avg > saved.best[key].avg)) { record = !!saved.best[key]; saved.best[key] = { avg, grade: g }; save(); }
+    const facts = [['Perfect orders', rs.filter(r => r.score >= 95).length], ['Walked out', rs.filter(r => r.walkout).length],
+      ['Asked to repeat', rs.filter(r => r.asks).length], ['Best streak', shift.bestStreak]];
+    app.replaceChildren(
+      h('section', { class: 'card' },
+        h('div', { class: 'gradebox' }, h('div', { class: 'grade ' + g, text: g }),
+          h('p', {}, h('b', { text: avg + '%' }), ' average', h('br'), money(shift.tips) + ' in tips', record ? h('br') : null, record ? 'New best for this length.' : null)),
+        h('p', { class: 'quip', text: QUIPS[g] }),
+        h('dl', { class: 'facts' }, facts.map(([k, v]) => h('div', {}, h('dt', { text: k }), h('dd', { text: String(v) })))),
+        h('h3', { text: 'Every customer' }),
+        h('ol', { class: 'rows' }, rs.map((r, i) => {
+          const labels = r.order.want.map(E.labelOf), v = verdict(r);
+          return h('li', {}, h('details', {},
+            h('summary', {}, h('span', { class: 'no', text: pad(i + 1) }),
+              h('span', { class: 'what', text: labels.slice(0, 3).join(', ') + (labels.length > 3 ? ` +${labels.length - 3}` : '') }),
+              h('span', { class: 'sc ' + v.cls, text: r.walkout ? 'left' : r.score + '%' })),
+            h('div', {}, detail(r))));
+        })),
+        h('div', { class: 'end-btns' },
+          h('button', { class: 'btn primary big', type: 'button', onclick: () => startShift(saved.len) }, 'New shift'),
+          h('button', { class: 'btn ghost big', type: 'button', onclick: showHome }, 'Back to start'))));
+    window.scrollTo(0, 0);
+  }
+
+  showHome();
+})();
+</script>
