@@ -9,10 +9,11 @@ Also here: **Flashlet**, a Quizlet-style study app (Flashcards, Learn, Test, Mat
 [`/flashlet/`](https://bubbletoptag.github.io/flashi/flashlet/). It is a single self-contained page,
 `public/flashlet/index.html`, and saves decks and progress in the browser.
 
-And **Sub Bar**, Spanish listening practice for ordering at a sub counter, at
-[`/sub-bar/`](https://bubbletoptag.github.io/flashi/sub-bar/). Customers speak 50 different orders (Edge TTS
-voices), you type what they want in English and get graded. The menu and orders live in
-`scripts/sub-bar/build.py`, which also remakes the audio and `public/sub-bar/data.js`.
+And **Sub Bar**, Spanish listening and ordering practice for a sub counter, at
+[`/sub-bar/`](https://bubbletoptag.github.io/flashi/sub-bar/). It installs to the Home Screen and works offline.
+*Server* mode: a customer says one of 50 orders in Spanish, you type what they want in English before the
+clock runs out. *Customer* mode: you read 50 different English subs and order each one in Spanish. The menu and
+orders live in `scripts/sub-bar/build.py`, which also makes the Edge TTS audio and `public/sub-bar/data.js`.
 
 ## Install on iPhone
 1. Open the site in Safari.

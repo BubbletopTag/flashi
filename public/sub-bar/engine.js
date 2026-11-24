@@ -6,7 +6,10 @@
   'use strict';
 
   // Words that turn "jalapeños" into "extra jalapeños". Stored the way tokens look after stemming.
-  const MODIFIERS = new Set(['extra', 'more', 'double', 'lot', 'plenty', 'heavy', 'additional', 'another']);
+  const MODIFIERS = {
+    en: new Set(['extra', 'more', 'double', 'lot', 'plenty', 'heavy', 'additional', 'another']),
+    es: new Set(['mas', 'extra', 'doble', 'mucho', 'mucha', 'bastante', 'adicional', 'otro', 'otra']),
+  };
   // What a player types when they ask for the order again in English instead of Spanish.
   const ENGLISH_ASK = new Set(['repeat', 'slow', 'slower', 'slowly', 'again']);
   const ASK_SLOW = ['despacio', 'lento', 'lentamente'];
@@ -67,19 +70,24 @@
     return hits;
   }
 
-  function create(menu) {
-    const full = [], part = [], label = {};
+  // lang "en" grades what a player types in English (server mode); "es" grades Spanish (customer mode).
+  function create(menu, opts) {
+    const es = !!opts && opts.lang === 'es';
+    const mods = es ? MODIFIERS.es : MODIFIERS.en;
+    const full = [], part = [], label = {}, bare = {};
     for (const item of menu) {
-      label[item.id] = item.en;
-      for (const s of item.syn) full.push({ id: item.id, t: tokens(s) });
-      for (const s of item.partial || []) part.push({ id: item.id, t: tokens(s) });
+      label[item.id] = es ? item.esLabel : item.en;
+      bare[item.id] = es ? item.esBare : item.en;
+      for (const s of (es ? item.es : item.syn)) full.push({ id: item.id, t: tokens(s) });
+      for (const s of (es ? item.esPartial : item.partial) || []) part.push({ id: item.id, t: tokens(s) });
     }
     const longestFirst = (a, b) => b.t.length - a.t.length || b.t.join('').length - a.t.join('').length;
     full.sort(longestFirst);
     part.sort(longestFirst);
     const hasPartial = new Set(part.map(p => p.id));
 
-    const labelOf = id => id.startsWith('more:') ? 'extra ' + label[id.slice(5)] : label[id];
+    const labelOf = id => !id.startsWith('more:') ? label[id]
+      : es ? 'un poco más de ' + bare[id.slice(5)] : 'extra ' + label[id.slice(5)];
 
     // Did they ask the customer to repeat or slow down? Spanish only, accents optional.
     function askKind(raw) {
@@ -105,7 +113,7 @@
 
     // order.want lists item ids, plus "more:<id>" for "a little more of <id>".
     // Right item: 1 point. Right kind of wrap but not which: half. An item that wasn't ordered: -1.
-    // Asking the customer to repeat caps the order at 90.
+    // Asking the customer to repeat caps the order at 90. Answering after the clock ran out halves it.
     function grade(order, text, opts) {
       const typed = tokens(text);
       const used = new Array(typed.length).fill(false);
@@ -113,7 +121,7 @@
       const items = order.want.filter(id => !id.startsWith('more:'));
       const needPartial = new Set(items.filter(id => !got.has(id) && hasPartial.has(id)));
       const partialGot = needPartial.size ? new Set(scan(typed, part, used, needPartial)) : new Set();
-      const modifier = typed.some(w => MODIFIERS.has(w));
+      const modifier = typed.some(w => mods.has(w));
 
       const matched = [], partial = [], missed = [];
       for (const id of order.want) {
@@ -126,6 +134,7 @@
       const raw = (matched.length + 0.5 * partial.length - wrong.length) / order.want.length;
       let score = Math.max(0, Math.min(1, raw)) * 100;
       if (opts && opts.asked) score *= 0.9;
+      if (opts && opts.late) score *= 0.5;
       return { score: Math.round(score), matched, partial, missed, wrong };
     }
 

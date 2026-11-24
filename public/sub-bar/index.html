@@ -6,8 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Sub Bar">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
+<script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 <!--/standalone-->
 <title>Sub Bar</title>
 <style>
@@ -171,6 +174,30 @@ summary .sc.bad { color: var(--bad); } summary .sc.ok { color: var(--ok); } summ
 details > div { padding: 0 12px 14px; }
 .end-btns { display: grid; gap: 8px; margin-top: 16px; }
 
+/* mode, length and pace pickers */
+.seg.two span { padding: 12px 8px; font-size: 17px; }
+.seg.two small { margin-top: 2px; }
+.seg.pace { gap: 6px; }
+.seg.pace span { padding: 9px 2px; font-size: 14px; }
+.seg.pace small { font-size: 11px; }
+.paceNote { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+
+/* the clock */
+.clockrow { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.clock { flex: 1; height: 9px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.clock i { display: block; height: 100%; width: 100%; background: var(--ok); border-radius: 99px; transition: width .12s linear, background .3s; }
+.clock i.mid { background: #e0a419; }
+.clock i.low { background: var(--bad); }
+.clockrow.paused { opacity: .5; }
+.secs { font: 800 15px var(--mono); min-width: 3.2ch; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* customer mode: what your friend wants */
+.where { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
+.prompt { margin: 4px 0 6px; font-size: 20px; line-height: 1.5; text-wrap: pretty; }
+.prompt b { font-weight: 800; text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 3px; text-underline-offset: 3px; }
+.tip small { display: block; font: 600 12px var(--font); text-align: right; }
+.verdict.late { background: var(--warn-bg); color: var(--warn); }
+
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 
@@ -187,8 +214,10 @@ details > div { padding: 0 12px 14px; }
   'use strict';
   const app = document.getElementById('app');
   if (!window.SUBBAR || !window.SubBarEngine) { app.textContent = 'Sub Bar could not load. Reload the page.'; return; }
-  const { menu, orders } = window.SUBBAR;
-  const E = SubBarEngine.create(menu);
+  const { menu, orders, subs } = window.SUBBAR;
+  const EN = SubBarEngine.create(menu, { lang: 'en' });     // grades English answers (server)
+  const ES = SubBarEngine.create(menu, { lang: 'es' });     // grades Spanish answers (customer)
+  const kindOf = Object.fromEntries(menu.map(m => [m.id, m.kind]));
   const statsEl = document.getElementById('stats');
   const money = n => '$' + n.toFixed(2);
   const pad = n => String(n).padStart(2, '0');
@@ -210,32 +239,43 @@ details > div { padding: 0 12px 14px; }
     return el;
   }
 
-  /* ---- what the browser remembers: best grade per shift length, how often each order came up ---- */
-  const KEY = 'subbar:v1';
-  const fresh = () => ({ best: {}, seen: {}, len: 10 });
+  /* ---- what the browser remembers: settings, best grades, how often each order came up ---- */
+  const KEY = 'subbar:v2';
+  const fresh = () => ({ best: {}, seen: {}, len: 10, mode: 'server', pace: 'normal' });
   const load = () => { try { return Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { return fresh(); } };
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch { /* private window: fine */ } };
   let saved = load();
 
+  // The clock. Server: about 20 s for a typical order, and it only runs while the customer is NOT talking.
+  // Customer: you have to read it and say it, so longer. Gluten-free customers have less patience.
+  const PACE = { practice: null, relaxed: 1.5, normal: 1, rush: 0.7 };
+  const TYPICAL = { server: 20, customer: 34 };
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  function budget(item, mode, pace) {
+    const m = PACE[pace]; if (m == null) return null;
+    const n = item.want.length;
+    return mode === 'server' ? clamp(5 + 2.5 * n, 12, 35) * m * (item.gf ? 0.7 : 1) : clamp(10 + 4 * n, 25, 60) * m;
+  }
+
   /* ---- audio: one element, so the phone keeps letting us play after the first tap ---- */
   const audio = new Audio();
   audio.preload = 'auto';
-  function hear(order, rate) {
-    if (audio.getAttribute('src') !== order.file) audio.src = order.file;   // a new src resets the speed, so set it after
+  function hear(item, rate) {
+    if (audio.getAttribute('src') !== item.file) audio.src = item.file;      // a new src resets the speed, so set it after
     audio.defaultPlaybackRate = rate; audio.playbackRate = rate;
     audio.preservesPitch = audio.webkitPreservesPitch = audio.mozPreservesPitch = true;
     audio.currentTime = 0;
     return audio.play();
   }
-  audio.onplaying = () => { if (cur && !cur.done) { cur.heard = true; cur.playing = true; ui(); } };
-  audio.onended = () => { if (cur && !cur.done) { cur.playing = false; ui(); if (els.answer && !els.answer.disabled) els.answer.focus({ preventScroll: true }); } };
+  audio.onplaying = () => { if (cur && !cur.done && shift.mode === 'server') { cur.heard = true; cur.playing = true; ui(); } };
+  audio.onended = () => { if (cur && !cur.done && shift.mode === 'server') { cur.playing = false; ui(); if (els.answer && !els.answer.disabled) els.answer.focus({ preventScroll: true }); } };
   audio.onerror = () => audioFailed();
-  document.addEventListener('visibilitychange', () => { if (document.hidden) audio.pause(); });
 
   /* ---- a shift and the customer in front of you ---- */
-  let shift = null, cur = null, els = {};
-
+  let shift = null, cur = null, els = {}, ticker = null, lastTick = 0;
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const engine = () => shift.mode === 'server' ? EN : ES;
+
   function setStats(on) {
     statsEl.hidden = !on;
     if (on) statsEl.replaceChildren(h('span', {}, 'Tips ', h('b', { text: money(shift.tips) })), h('span', {}, 'Streak ', h('b', { text: String(shift.streak) })));
@@ -244,83 +284,174 @@ details > div { padding: 0 12px 14px; }
   const QUIPS = { A: 'Customers would line up for you.', B: 'Solid shift. A few orders got away.', C: 'You caught most of it. Listen for the ingredients.',
     D: 'Rough shift. Slow down and listen for each word.', F: 'Everyone left hungry. Try a shorter shift and go again.' };
 
+  /* ---- the ticker: counts the clock down, but only while it should run ---- */
+  const running = () => cur && !cur.done && !cur.leaving && (shift.mode === 'customer' || (cur.heard && !cur.playing));
+  function startTicker() { stopTicker(); lastTick = performance.now(); ticker = setInterval(tick, 100); }
+  function stopTicker() { if (ticker) clearInterval(ticker); ticker = null; }
+  function tick() {
+    const now = performance.now(), dt = (now - lastTick) / 1000; lastTick = now;
+    if (!cur || document.hidden || !running()) { if (cur && els.clock) updateClock(); return; }
+    cur.used += dt;
+    if (cur.total != null) {
+      cur.left = Math.max(0, cur.left - dt);
+      updateClock();
+      if (cur.left <= 0) timeUp();
+    }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) audio.pause(); lastTick = performance.now(); });
+
   /* ---------------- home ---------------- */
+  const MODES = {
+    server: {
+      title: 'Take the orders.', lede: 'You’re behind the counter. The customer speaks Spanish. You type what they want, in English.',
+      rules: [
+        [h('b', { text: 'Listen once. ' }), 'Tap the speaker. There are no subtitles.'],
+        [h('b', { text: 'Answer fast. ' }), 'The clock starts when they stop talking. Stall and they walk off with whatever you said.'],
+        [h('b', { text: 'Type it in English. ' }), 'Your keyboard’s dictation works too.'],
+        [h('b', { text: 'Missed it? ' }), 'Ask in Spanish: ', h('em', { text: '¿puede repetir?' }), ' or ', h('em', { text: 'más despacio' }), ' (70% speed). Once only: a second ask and they storm out. Gluten-free customers won’t wait at all.']] },
+    customer: {
+      title: 'Order in Spanish.', lede: 'You’re at a sub shop in Puerto Rico, ordering for a friend. You read what they want in English. You order it in Spanish.',
+      rules: [
+        [h('b', { text: 'Read your friend’s order. ' }), '50 different subs, and every ingredient comes up.'],
+        [h('b', { text: 'Say it in Spanish. ' }), 'Type it the way you’d say it. Accents are optional and typos are forgiven.'],
+        [h('b', { text: 'Answer fast. ' }), 'The clock starts right away. Run out and they take what you managed to say.'],
+        [h('b', { text: 'Then listen. ' }), 'You’ll hear how someone from Puerto Rico would order it.']] },
+  };
+  const bestKey = () => [saved.mode, saved.len, saved.pace].join('-');
+
   function showHome() {
-    audio.pause(); shift = null; cur = null; setStats(false);
-    const lens = [[10, 'Quick'], [25, 'Half shift'], [50, 'Full day']];
-    const seg = h('div', { class: 'seg' }, lens.map(([n, name]) => h('label', {},
-      h('input', { type: 'radio', name: 'len', value: n, checked: saved.len === n, onchange: () => { saved.len = n; save(); showBest(); } }),
-      h('span', {}, String(n), h('small', { text: name })))));
+    audio.pause(); stopTicker(); shift = null; cur = null; setStats(false);
+    const M = MODES[saved.mode];
+    const radios = (name, rows, current, onpick, cls) => h('div', { class: 'seg ' + (cls || '') }, rows.map(([v, big, small]) => h('label', {},
+      h('input', { type: 'radio', name, value: v, checked: String(current) === String(v), onchange: () => onpick(v) }),
+      h('span', {}, big, h('small', { text: small })))));
     const best = h('p', { class: 'best' });
-    const showBest = () => { const b = saved.best[saved.len]; best.textContent = b ? `Best ${saved.len}-customer shift: ${b.grade}, ${b.avg}%` : ''; };
-    showBest();
+    const paceNote = h('p', { class: 'paceNote' });
+    const refresh = () => {
+      const b = saved.best[bestKey()];
+      best.textContent = b ? `Your best here: ${b.grade}, ${b.avg}%` : '';
+      paceNote.textContent = saved.pace === 'practice' ? 'No clock. Good for learning the words.'
+        : `A typical order gives you about ${Math.round(TYPICAL[saved.mode] * PACE[saved.pace])} seconds.`;
+    };
+    refresh();
+    const paceRows = [['practice', 'Practice', 'no clock'], ['relaxed', 'Relaxed', ''], ['normal', 'Normal', ''], ['rush', 'Rush', '']]
+      .map(([v, name]) => [v, name, v === 'practice' ? 'no clock' : Math.round(TYPICAL[saved.mode] * PACE[v]) + ' s']);
     app.replaceChildren(h('section', { class: 'card' },
-      h('h1', { text: 'Take the orders.' }),
-      h('p', { class: 'lede', text: 'The customer speaks Spanish. You type what they want, in English.' }),
-      h('ol', { class: 'rules' },
-        h('li', {}, h('span', {}, h('b', { text: 'Listen once. ' }), 'Tap the speaker. There are no subtitles.')),
-        h('li', {}, h('span', {}, h('b', { text: 'Type it in English. ' }), 'Your phone keyboard’s dictation works too.')),
-        h('li', {}, h('span', {}, h('b', { text: 'Missed it? ' }), 'Ask in Spanish: ', h('em', { text: '¿puede repetir?' }), ' or ', h('em', { text: 'más despacio' }), ' (70% speed).')),
-        h('li', {}, h('span', {}, h('b', { text: 'Ask once, not twice. ' }), 'A second ask and they walk out. Gluten-free customers won’t wait at all.'))),
-      h('fieldset', {}, h('legend', { text: 'Shift length' }), seg),
+      h('fieldset', {}, h('legend', { text: 'Who are you?' }), radios('mode', [['server', 'Server', 'hear it, type English'], ['customer', 'Customer', 'read English, say Spanish']], saved.mode,
+        v => { saved.mode = v; save(); showHome(); document.querySelector('input[name=mode]:checked').focus(); }, 'two')),
+      h('h1', { text: M.title }),
+      h('p', { class: 'lede', text: M.lede }),
+      h('ol', { class: 'rules' }, M.rules.map(r => h('li', {}, h('span', {}, r)))),
+      h('fieldset', {}, h('legend', { text: 'Shift length' }), radios('len', [[10, '10', 'Quick'], [25, '25', 'Half shift'], [50, '50', 'Full day']], saved.len, v => { saved.len = +v; save(); refresh(); })),
+      h('fieldset', {}, h('legend', { text: 'Pace' }), radios('pace', paceRows, saved.pace, v => { saved.pace = v; save(); refresh(); }, 'pace'), paceNote),
       h('button', { class: 'btn primary big', type: 'button', onclick: () => startShift(saved.len) }, 'Open the shop'),
       best));
   }
 
   function startShift(n) {
-    const ranked = orders.map(o => [o, (saved.seen[o.id] || 0) + Math.random()]).sort((a, b) => a[1] - b[1]).map(x => x[0]);
-    shift = { queue: shuffle(ranked.slice(0, Math.min(n, ranked.length))), i: 0, results: [], tips: 0, streak: 0, bestStreak: 0, confirmEnd: false };
+    const pool = saved.mode === 'server' ? orders : subs;
+    const ranked = pool.map(o => [o, (saved.seen[o.id] || 0) + Math.random()]).sort((a, b) => a[1] - b[1]).map(x => x[0]);
+    shift = { mode: saved.mode, pace: saved.pace, queue: shuffle(ranked.slice(0, Math.min(n, ranked.length))), i: 0, results: [], tips: 0, streak: 0, bestStreak: 0, confirmEnd: false };
     nextCustomer();
   }
   function nextCustomer() {
     if (shift.i >= shift.queue.length) return showReport();
     audio.pause();
-    cur = { order: shift.queue[shift.i], listened: false, heard: false, playing: false, asks: 0, mood: 'calm', done: false, log: [] };
-    renderOrder();
+    const item = shift.queue[shift.i], total = budget(item, shift.mode, shift.pace);
+    cur = { item, listened: false, heard: false, playing: false, asks: 0, done: false, leaving: false, log: [], total, left: total, used: 0, mood: 'calm' };
+    renderOrder(); startTicker();
   }
 
   /* ---------------- the order ---------------- */
+  const list = nodes => nodes.flatMap((n, i) => [i ? (i === nodes.length - 1 ? ' and ' : ', ') : null, n]).filter(x => x != null);
+  function describe(item) {                                     // customer mode: the friend's order, in English
+    const w = item.want.filter(id => !id.startsWith('more:'));
+    const by = k => w.filter(id => kindOf[id] === k);
+    const b = id => h('b', { text: EN.labelOf(id) });
+    const bread = by('bread')[0], mains = [...by('filling'), ...by('cheese')], vegs = by('veg'), sauces = by('sauce');
+    const wrap = ['flour', 'spinachT', 'tomatoT'].includes(bread);
+    const out = ['Your friend wants ', wrap ? 'a wrap on a ' : 'a sub on ', b(bread)];
+    if (mains.length) out.push(' with ', ...list(mains.map(b)));
+    out.push('.');
+    if (w.includes('toasted')) out.push(' Toasted.');
+    if (vegs.length) out.push(' Add ', ...list(vegs.map(b)), '.');
+    if (sauces.length) out.push(' Sauce: ', ...list(sauces.map(b)), '.');
+    const more = item.want.find(id => id.startsWith('more:'));
+    if (more) out.push(' And a little more ', b(more.slice(5)), '.');
+    return out;
+  }
+
   function renderOrder() {
     setStats(true); shift.confirmEnd = false;
-    const N = shift.queue.length;
+    const server = shift.mode === 'server', N = shift.queue.length;
     els = {};
-    els.speak = h('button', { class: 'speak', type: 'button', 'aria-label': 'Play the order', onclick: onSpeak }, svgEl(ICON.speaker));
-    els.label = h('p', { class: 'speak-label', 'aria-live': 'polite' });
-    els.speaker = h('div', { class: 'speaker' }, els.speak, els.label);
     els.mood = h('span', { class: 'mood' });
     els.log = h('ul', { class: 'log', 'aria-live': 'polite' });
-    els.answer = h('textarea', { id: 'answer', rows: 2, lang: 'en', placeholder: 'Listen first', autocomplete: 'off', autocapitalize: 'sentences', spellcheck: 'true', enterkeyhint: 'send', 'aria-label': 'What do they want? Answer in English.', disabled: true });
-    els.send = h('button', { class: 'btn primary', type: 'submit', disabled: true }, 'Send');
+    els.answer = h('textarea', { id: 'answer', rows: 2, lang: server ? 'en' : 'es', placeholder: server ? 'Listen first' : 'Order it in Spanish', autocomplete: 'off', autocapitalize: 'sentences', spellcheck: 'true', enterkeyhint: 'send', 'aria-label': server ? 'What do they want? Answer in English.' : 'Order the sub in Spanish.', disabled: server });
+    els.send = h('button', { class: 'btn primary', type: 'submit', disabled: server }, 'Send');
     els.answer.addEventListener('input', () => { els.answer.style.height = 'auto'; els.answer.style.height = Math.min(els.answer.scrollHeight, 120) + 'px'; });
     els.answer.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); onSend(); } });
-    els.ticket = h('article', { class: 'ticket' },
-      h('div', { class: 'ticket-head' }, h('span', { class: 'no', text: 'No. ' + pad(shift.i + 1) }), els.mood),
-      h('hr', { class: 'rule' }),
-      els.speaker, els.log,
-      h('form', { class: 'reply', onsubmit: e => { e.preventDefault(); onSend(); } }, els.answer, els.send),
-      h('p', { class: 'hint' }, 'Need it again? Type ', h('b', { text: '¿puede repetir?' }), ' or ', h('b', { text: 'más despacio' }), '.'));
+    const parts = [h('div', { class: 'ticket-head' }, h('span', { class: 'no', text: 'No. ' + pad(shift.i + 1) }), els.mood)];
+    if (cur.total != null) {
+      els.bar = h('i'); els.secs = h('b', { class: 'secs' });
+      els.clock = h('div', { class: 'clockrow', role: 'timer', 'aria-label': 'Time left' }, h('span', { class: 'clock' }, els.bar), els.secs);
+      parts.push(els.clock);
+    }
+    parts.push(h('hr', { class: 'rule' }));
+    if (server) {
+      els.speak = h('button', { class: 'speak', type: 'button', 'aria-label': 'Play the order', onclick: onSpeak }, svgEl(ICON.speaker));
+      els.label = h('p', { class: 'speak-label', 'aria-live': 'polite' });
+      els.speaker = h('div', { class: 'speaker' }, els.speak, els.label);
+      parts.push(els.speaker);
+    } else {
+      parts.push(h('p', { class: 'where', text: 'Sub shop, Puerto Rico' }), h('p', { class: 'prompt' }, describe(cur.item)));
+    }
+    parts.push(els.log, h('form', { class: 'reply', onsubmit: e => { e.preventDefault(); onSend(); } }, els.answer, els.send),
+      server ? h('p', { class: 'hint' }, 'Need it again? Type ', h('b', { text: '¿puede repetir?' }), ' or ', h('b', { text: 'más despacio' }), '.')
+             : h('p', { class: 'hint', text: 'Accents are optional and typos are forgiven.' }));
+    els.ticket = h('article', { class: 'ticket' }, parts);
     els.end = h('button', { class: 'link', type: 'button', onclick: onEnd }, 'End shift');
     app.replaceChildren(
       h('div', { class: 'prog' }, h('span', {}, 'Customer ', h('b', { text: String(shift.i + 1) }), ' of ' + N), h('span', { class: 'meter' }, h('i', { style: `width:${shift.i / N * 100}%` }))),
       els.ticket, els.end);
     ui();
+    if (!server && !matchMedia('(pointer: coarse)').matches) els.answer.focus({ preventScroll: true });
+  }
+
+  function setMood() {
+    const f = cur.total ? cur.left / cur.total : 1;
+    cur.mood = cur.leaving ? 'gone' : (cur.asks > 0 || f < 0.5) ? 'impatient' : 'calm';
+    els.mood.dataset.mood = cur.mood;
+    els.mood.textContent = { calm: 'Calm', impatient: 'Impatient', gone: 'Gone' }[cur.mood];
+  }
+  function updateClock() {
+    if (!cur || !els.mood) return;
+    setMood();
+    if (!els.bar) return;
+    const f = cur.left / cur.total;
+    els.bar.style.width = (f * 100) + '%';
+    els.bar.className = f > 0.5 ? '' : f > 0.25 ? 'mid' : 'low';
+    els.secs.textContent = Math.ceil(cur.left) + 's';
+    els.clock.classList.toggle('paused', !running());
   }
 
   // Redraws everything that depends on the customer's state.
   function ui() {
-    if (!cur || !els.speaker || cur.done) return;
-    const state = cur.playing ? 'playing' : cur.listened ? 'done' : 'ready';
-    els.speaker.dataset.state = state;
-    els.speak.setAttribute('aria-disabled', String(state !== 'ready'));
-    els.speak.replaceChildren(svgEl(state === 'done' ? ICON.check : ICON.speaker));
-    els.label.textContent = cur.leaving ? '' : state === 'ready' ? 'Tap to hear the order' : state === 'playing' ? 'Listening…'
-      : cur.asks ? 'Heard it again. Type what they want.' : 'You heard it. Type what they want.';
-    els.mood.dataset.mood = cur.mood;
-    els.mood.textContent = { calm: 'Calm', impatient: 'Impatient', gone: 'Gone' }[cur.mood];
-    const typing = cur.listened && !cur.leaving;
-    els.answer.disabled = !typing; els.send.disabled = !typing;
-    els.answer.placeholder = typing ? 'What do they want? (English)' : cur.leaving ? '' : 'Listen first';
+    if (!cur || !els.ticket || cur.done) return;
+    const server = shift.mode === 'server';
+    if (server) {
+      const state = cur.playing ? 'playing' : cur.listened ? 'done' : 'ready';
+      els.speaker.dataset.state = state;
+      els.speak.setAttribute('aria-disabled', String(state !== 'ready'));
+      els.speak.replaceChildren(svgEl(state === 'done' ? ICON.check : ICON.speaker));
+      els.label.textContent = cur.leaving ? '' : state === 'ready' ? 'Tap to hear the order' : state === 'playing' ? 'Listening…'
+        : cur.asks ? 'Heard it again. Type what they want.' : 'You heard it. Type what they want.';
+    }
+    const open = (!server || cur.listened) && !cur.leaving;
+    els.answer.disabled = !open; els.send.disabled = !open;
+    els.answer.placeholder = open ? (server ? 'What do they want? (English)' : 'Order it in Spanish') : cur.leaving ? '' : 'Listen first';
     els.log.replaceChildren(...cur.log.map(l => h('li', { class: l.kind + (l.tone ? ' ' + l.tone : ''), text: l.text })));
+    updateClock();
   }
   const say = (kind, text, tone) => { cur.log.push({ kind, text, tone }); };
 
@@ -333,119 +464,149 @@ details > div { padding: 0 12px 14px; }
       return;
     }
     cur.listened = true; ui();
-    hear(cur.order, 1).catch(audioFailed);
+    hear(cur.item, 1).catch(audioFailed);
   }
   function audioFailed() {
-    if (!cur || cur.done) return;
+    if (!cur || cur.done || shift.mode !== 'server') return;
     cur.playing = false;
     if (!cur.heard) { cur.listened = false; say('note', 'The audio would not play. Check your connection and tap the speaker again.', 'warn'); }
     ui();
   }
 
   function onSend() {
-    if (!cur || cur.done || cur.leaving || !cur.listened) return;
+    if (!cur || cur.done || cur.leaving) return;
+    const server = shift.mode === 'server';
+    if (server && !cur.listened) return;
     const text = els.answer.value.trim();
     if (!text) { els.ticket.classList.remove('shake'); void els.ticket.offsetWidth; els.ticket.classList.add('shake'); return; }
-    const c = E.classify(text);
-    if (c.kind === 'ask') return onAsk(c.ask, text);
-    if (c.kind === 'english-ask') {
-      say('note', 'The customer only speaks Spanish. Try ¿puede repetir? or más despacio.', 'warn'); els.answer.value = ''; ui(); return;
+    if (server) {
+      const c = EN.classify(text);
+      if (c.kind === 'ask') return onAsk(c.ask, text);
+      if (c.kind === 'english-ask') { say('note', 'The customer only speaks Spanish. Try ¿puede repetir? or más despacio.', 'warn'); els.answer.value = ''; ui(); return; }
     }
-    finish({ ...E.grade(cur.order, text, { asked: cur.asks > 0 }), text, walkout: false });
+    answer(text, false);
+  }
+
+  // Grade what they typed. `late` means the clock ran out first, which halves the score.
+  function answer(text, late) {
+    const g = text ? engine().grade(cur.item, text, { asked: cur.asks > 0, late }) : { score: 0, matched: [], partial: [], missed: cur.item.want.slice(), wrong: [] };
+    finish({ ...g, text, late, walkout: false });
   }
 
   function onAsk(kind, text) {
     say('you', text); els.answer.value = ''; els.answer.style.height = ''; cur.asks++;
-    const allowed = cur.order.gf ? 0 : 1;           // gluten-free customers don't tolerate even one
+    const allowed = cur.item.gf ? 0 : 1;            // gluten-free customers don't tolerate even one
     if (cur.asks > allowed) {
-      cur.mood = 'gone'; cur.leaving = true; audio.pause(); cur.playing = false;
-      say('note', cur.order.gf ? 'They won’t wait around. They storm out.' : 'That’s twice. They storm out.', 'bad');
+      cur.leaving = true; audio.pause(); cur.playing = false;
+      say('note', cur.item.gf ? 'They won’t wait around. They storm out.' : 'That’s twice. They storm out.', 'bad');
       ui(); els.ticket.classList.add('gone');
-      setTimeout(() => finish({ score: 0, matched: [], partial: [], missed: cur.order.want.slice(), wrong: [], text: '', walkout: true }), 950);
+      setTimeout(() => finish({ score: 0, matched: [], partial: [], missed: cur.item.want.slice(), wrong: [], text: '', walkout: true, late: false }), 950);
       return;
     }
-    cur.mood = 'impatient';
     say('note', kind === 'slow' ? 'The customer sighs and repeats it slowly.' : 'The customer sighs and repeats the order.');
     cur.playing = true; ui();
-    hear(cur.order, kind === 'slow' ? 0.7 : 1).catch(audioFailed);
+    hear(cur.item, kind === 'slow' ? 0.7 : 1).catch(audioFailed);
+  }
+
+  function timeUp() {
+    if (!cur || cur.done || cur.leaving) return;
+    const text = els.answer.value.trim();
+    cur.leaving = true; audio.pause(); cur.playing = false;
+    say('note', shift.mode === 'server' ? 'Time’s up. They walk off with whatever you said.' : 'Time’s up. The cashier goes with whatever you said.', 'bad');
+    ui(); els.ticket.classList.add('gone');
+    setTimeout(() => answer(text, true), 950);
   }
 
   function onEnd() {
     if (!shift.confirmEnd) { shift.confirmEnd = true; els.end.textContent = 'Tap again to end the shift and see your grade'; return; }
-    audio.pause();
+    audio.pause(); stopTicker();
     if (shift.results.length) showReport(); else showHome();
   }
 
   /* ---------------- after each customer ---------------- */
   function finish(r) {
     if (cur.done) return;
-    cur.done = true; audio.pause();
-    r.order = cur.order; r.asks = cur.asks;
-    r.tip = r.walkout ? 0 : +(r.score / 100 * 5).toFixed(2);
+    cur.done = true; audio.pause(); stopTicker();
+    r.item = cur.item; r.asks = cur.asks; r.used = cur.used; r.total = cur.total;
+    r.bonus = cur.total != null && !r.late && !r.walkout && r.score >= 75 ? +(1.5 * cur.left / cur.total).toFixed(2) : 0;   // fast answers tip more
+    r.tip = r.walkout ? 0 : +(r.score / 100 * 5 + r.bonus).toFixed(2);
     shift.tips += r.tip;
     if (r.score >= 90) { shift.streak++; shift.bestStreak = Math.max(shift.bestStreak, shift.streak); } else shift.streak = 0;
     shift.results.push(r);
-    saved.seen[r.order.id] = (saved.seen[r.order.id] || 0) + 1; save();
+    saved.seen[r.item.id] = (saved.seen[r.item.id] || 0) + 1; save();
     renderResult(r);
   }
-  const verdict = r => r.walkout ? { text: 'Walked out', cls: 'bad' } : r.score >= 95 ? { text: 'Perfect', cls: 'ok' }
+  const verdict = r => r.walkout ? { text: 'Walked out', cls: 'bad' } : r.late ? { text: 'Too slow', cls: 'late' } : r.score >= 95 ? { text: 'Perfect', cls: 'ok' }
     : r.score >= 75 ? { text: 'Good', cls: 'ok' } : r.score >= 50 ? { text: 'Close', cls: 'warn' } : { text: 'Missed', cls: 'bad' };
 
   function chipsFor(r) {
+    const E = engine(), spanish = E === ES;
+    const eng = id => spanish ? EN.labelOf(id) : null;      // in Spanish mode, show the English too when you missed it
     const chip = (cls, mark, id, note) => h('li', { class: 'chip ' + cls }, mark ? h('i', { text: mark }) : null, E.labelOf(id), note ? h('small', { text: note }) : null);
     return h('ul', { class: 'chips' },
-      r.walkout ? r.order.want.map(id => chip('plain', '', id)) : r.order.want.map(id => r.matched.includes(id) ? chip('ok', '✓', id) : r.partial.includes(id) ? chip('half', '½', id, 'which one?') : chip('miss', '✕', id)),
-      r.wrong.map(id => chip('wrong', '!', id, 'not ordered')));
+      r.walkout ? r.item.want.map(id => chip('plain', '', id))
+        : r.item.want.map(id => r.matched.includes(id) ? chip('ok', '✓', id) : r.partial.includes(id) ? chip('half', '½', id, 'which one?') : chip('miss', '✕', id, eng(id))),
+      r.wrong.map(id => chip('wrong', '!', id, spanish ? 'not wanted' : 'not ordered')));
   }
   function detail(r) {
+    const server = shift.mode === 'server';
     return [
-      h('div', { class: 'block' }, h('h3', { text: 'They wanted' }), chipsFor(r)),
-      r.text ? h('p', { class: 'said' }, 'You wrote: ', h('q', { text: r.text })) : null,
-      h('div', { class: 'block' }, h('h3', { text: 'They said' }), h('p', { class: 'heard', lang: 'es', text: r.order.es }),
+      h('div', { class: 'block' }, h('h3', { text: server ? 'They wanted' : 'Your friend wanted' }), chipsFor(r)),
+      r.text ? h('p', { class: 'said' }, server ? 'You wrote: ' : 'You said: ', h('q', { text: r.text })) : null,
+      h('div', { class: 'block' }, h('h3', { text: server ? 'They said' : 'Say it like this' }), h('p', { class: 'heard', lang: 'es', text: r.item.es }),
         h('div', { class: 'row-btns' },
-          h('button', { class: 'btn small', type: 'button', onclick: () => hear(r.order, 1).catch(() => {}) }, 'Hear it'),
-          h('button', { class: 'btn small', type: 'button', onclick: () => hear(r.order, 0.7).catch(() => {}) }, 'Hear it slowly'))),
+          h('button', { class: 'btn small', type: 'button', onclick: () => hear(r.item, 1).catch(() => {}) }, 'Hear it'),
+          h('button', { class: 'btn small', type: 'button', onclick: () => hear(r.item, 0.7).catch(() => {}) }, 'Hear it slowly'))),
     ];
   }
   function renderResult(r) {
     setStats(true);
-    const v = verdict(r), last = shift.i + 1 >= shift.queue.length;
+    const v = verdict(r), last = shift.i + 1 >= shift.queue.length, N = shift.queue.length;
     const next = h('button', { class: 'btn primary big next', type: 'button', onclick: () => { shift.i++; nextCustomer(); window.scrollTo(0, 0); } }, last ? 'See your grade' : 'Next customer');
+    const secs = r.total != null && !r.walkout && !r.late ? ` Answered in ${r.used.toFixed(1)} s.` : '';
     app.replaceChildren(
-      h('div', { class: 'prog' }, h('span', {}, 'Customer ', h('b', { text: String(shift.i + 1) }), ' of ' + shift.queue.length),
-        h('span', { class: 'meter' }, h('i', { style: `width:${(shift.i + 1) / shift.queue.length * 100}%` }))),
+      h('div', { class: 'prog' }, h('span', {}, 'Customer ', h('b', { text: String(shift.i + 1) }), ' of ' + N), h('span', { class: 'meter' }, h('i', { style: `width:${(shift.i + 1) / N * 100}%` }))),
       h('article', { class: 'ticket', 'aria-live': 'polite' },
         h('div', { class: 'ticket-head' }, h('span', { class: 'no', text: 'No. ' + pad(shift.i + 1) }), h('span', { class: 'verdict ' + v.cls, text: v.text })),
         h('div', { class: 'scorebox' }, h('div', { class: 'pct' }, String(r.score), h('span', { text: '%' })),
-          h('div', { class: 'tip', text: r.walkout ? 'No tip' : '+' + money(r.tip) + ' tip' })),
-        r.walkout ? h('p', { class: 'said', text: 'They left before you answered.' }) : r.asks ? h('p', { class: 'said', text: 'You asked them to repeat, so this order tops out at 90.' }) : null,
+          h('div', { class: 'tip' }, r.walkout ? 'No tip' : '+' + money(r.tip) + ' tip', r.bonus ? h('small', { text: 'incl. ' + money(r.bonus) + ' for speed' }) : null)),
+        r.walkout ? h('p', { class: 'said', text: 'They left before you answered.' })
+          : r.late ? h('p', { class: 'said', text: 'The clock ran out, so this order is worth half.' })
+          : r.asks ? h('p', { class: 'said', text: 'You asked them to repeat, so this order tops out at 90.' + secs })
+          : secs ? h('p', { class: 'said', text: secs.trim() }) : null,
         detail(r), next));
     next.focus({ preventScroll: true }); window.scrollTo(0, 0);
   }
 
   /* ---------------- end of shift ---------------- */
   function showReport() {
-    audio.pause(); cur = null; setStats(true);
-    const rs = shift.results, n = rs.length;
+    audio.pause(); stopTicker(); cur = null; setStats(true);
+    const rs = shift.results, n = rs.length, server = shift.mode === 'server';
     const avg = Math.round(rs.reduce((s, r) => s + r.score, 0) / n), g = grade(avg);
-    const key = [10, 25, 50].includes(shift.queue.length) && n === shift.queue.length ? shift.queue.length : null;
+    const key = [shift.mode, shift.queue.length, shift.pace].join('-');
     let record = false;
-    if (key && (!saved.best[key] || avg > saved.best[key].avg)) { record = !!saved.best[key]; saved.best[key] = { avg, grade: g }; save(); }
-    const facts = [['Perfect orders', rs.filter(r => r.score >= 95).length], ['Walked out', rs.filter(r => r.walkout).length],
-      ['Asked to repeat', rs.filter(r => r.asks).length], ['Best streak', shift.bestStreak]];
+    if ([10, 25, 50].includes(shift.queue.length) && n === shift.queue.length && (!saved.best[key] || avg > saved.best[key].avg)) {
+      record = !!saved.best[key]; saved.best[key] = { avg, grade: g }; save();
+    }
+    const answered = rs.filter(r => !r.walkout && !r.late && r.total != null);
+    const fastest = answered.length ? Math.min(...answered.map(r => r.used)).toFixed(1) + ' s' : '–';
+    const facts = [['Perfect orders', rs.filter(r => r.score >= 95).length],
+      ...(server ? [['Walked out', rs.filter(r => r.walkout).length], ['Asked to repeat', rs.filter(r => r.asks).length]] : []),
+      ['Too slow', rs.filter(r => r.late).length], ['Best streak', shift.bestStreak], ['Fastest answer', fastest]];
+    const E = engine();
     app.replaceChildren(
       h('section', { class: 'card' },
         h('div', { class: 'gradebox' }, h('div', { class: 'grade ' + g, text: g }),
-          h('p', {}, h('b', { text: avg + '%' }), ' average', h('br'), money(shift.tips) + ' in tips', record ? h('br') : null, record ? 'New best for this length.' : null)),
+          h('p', {}, h('b', { text: avg + '%' }), ' average', h('br'), money(shift.tips) + ' in tips', record ? h('br') : null, record ? 'New best for this setup.' : null)),
         h('p', { class: 'quip', text: QUIPS[g] }),
         h('dl', { class: 'facts' }, facts.map(([k, v]) => h('div', {}, h('dt', { text: k }), h('dd', { text: String(v) })))),
-        h('h3', { text: 'Every customer' }),
+        h('h3', { text: 'Every ' + (server ? 'customer' : 'sub') }),
         h('ol', { class: 'rows' }, rs.map((r, i) => {
-          const labels = r.order.want.map(E.labelOf), v = verdict(r);
+          const labels = r.item.want.map(E.labelOf), v = verdict(r);
           return h('li', {}, h('details', {},
             h('summary', {}, h('span', { class: 'no', text: pad(i + 1) }),
               h('span', { class: 'what', text: labels.slice(0, 3).join(', ') + (labels.length > 3 ? ` +${labels.length - 3}` : '') }),
-              h('span', { class: 'sc ' + v.cls, text: r.walkout ? 'left' : r.score + '%' })),
+              h('span', { class: 'sc ' + v.cls, text: r.walkout ? 'left' : r.late ? 'late' : r.score + '%' })),
             h('div', {}, detail(r))));
         })),
         h('div', { class: 'end-btns' },
